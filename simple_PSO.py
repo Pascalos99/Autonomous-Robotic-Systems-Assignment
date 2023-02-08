@@ -1,9 +1,9 @@
-import math
 import numpy as np
 from numpy.random import uniform as U
 from random import random as rnd
+import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib import interactive
+import matplotlib.animation as animation
 
 # Try a simple iterative approach first
 
@@ -129,8 +129,8 @@ if __name__ == '__main__':
 
     # DEFINE FUNCTION
     A, B = 0, 100
-    func = lambda x: (A - x[0])**2 + B * (x[1] - x[0]**2)**2
-    # func = lambda x: 2 * 10 + ((x[0]**2 - 10 * np.cos(2 * np.pi * x[0])) + (x[1]**2 - 10 * np.cos(2 * np.pi * x[1])))
+    rosenbrock_func = lambda x: (A - x[0])**2 + B * (x[1] - x[0]**2)**2
+    rastrigin_func = lambda x: 2 * 10 + ((x[0]**2 - 10 * np.cos(2 * np.pi * x[0])) + (x[1]**2 - 10 * np.cos(2 * np.pi * x[1])))
     # both functions seem to work perfectly fine; getting to (0,0) in about ~50 steps
 
     x_range = (-3, 3)
@@ -139,13 +139,32 @@ if __name__ == '__main__':
     num_particles = 20
     num_iters = 100
     dt = 0.1
+    func = rastrigin_func # only change this
     swarm = init_swarm(num_particles, func, x_range, x_shape, abc)
     PSO(grapher, swarm, num_iters, dt)
 
-    # This may very well need to be improved!
-    for i in range(len(xss)):
-        plt.figure(i+1)
-        plt.scatter([x[0] for x in xss[i]], [x[1] for x in xss[i]])
-        plt.xlim(x_range)
-        plt.ylim(x_range)
-        plt.show()
+
+    # X, Y needed for the benchmark function
+    x = np.arange(*x_range, 0.025)
+    y = np.arange(*x_range, 0.025)
+    X, Y = np.meshgrid(x, y)
+
+    fig, ax = plt.subplots()
+
+    contour = ax.contourf(X, Y, func((X, Y)), 250, vmin=0, vmax=60, cmap=mpl.colormaps['jet'])
+    ax.set_xlim(x_range)
+    ax.set_ylim(x_range)
+    ax.set_title("Benchmark function: Rastrigin")
+    ax.set_xlabel("x values")
+    ax.set_ylabel("y values")
+    scat = ax.scatter([x[0] for x in xss[0]], [x[1] for x in xss[0]], c='w', marker="*")
+
+    def animate(i):
+        scat.set_offsets(xss[i])
+        return scat, 
+
+    ani = animation.FuncAnimation(fig, animate, frames=len(xss), interval=100, blit=True)
+    FFwriter = animation.FFMpegWriter(fps=10)
+    ani.save('rastrigin.mp4', writer=FFwriter)
+    
+    plt.show()
