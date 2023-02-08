@@ -9,7 +9,7 @@ import matplotlib.animation as animation
 
 # Particle stores all necessary information to represent a single agent in the swarm
 class Particle:
-    def __init__(self, pos, vel, function: callable, abc: tuple):
+    def __init__(self, pos, vel, function: callable, abc: tuple, remember_global_best_of_all_time=False):
         self.update_listeners = []
 
         self.pos = pos
@@ -21,8 +21,11 @@ class Particle:
         self.gbest = None
         self.gprf = None
         self.function = function
+        self.remember_global_best_of_all_time = remember_global_best_of_all_time
     
     def update_global_best(self, gpos, gprf) -> None:
+        if self.remember_global_best_of_all_time and self.gprf is not None:
+            if self.gprf < gprf: return
         self.gbest = gpos
         self.gprf = gprf
 
@@ -38,14 +41,14 @@ class Particle:
             self.pbest = self.pos
             self.pprf = self.prf
 
-def init_swarm(num_particles: int, function: callable, x_range: tuple, x_shape: tuple, abc: tuple) -> list:
+def init_swarm(num_particles: int, function: callable, x_range: tuple, x_shape: tuple, abc: tuple, **kwargs) -> list:
     swarm = []
     x_min, x_max = x_range
     for i in range(num_particles):
         pos = U(x_min, x_max, x_shape)
         swarm.append(Particle(pos,
             U(x_min - x_max, x_max - x_min, x_shape),
-            function, abc))
+            function, abc, **kwargs))
     return swarm
 
 def swarm_iteration(swarm: list, neighbor_function: callable, dt: float) -> None:
@@ -72,7 +75,20 @@ def get_2nd_best_of_swarm(swarm: list, best_particle: Particle) -> Particle:
             almost_best_particle = particle
     return almost_best_particle
 
-def PSO(grapher: callable, swarm: list, num_iters: int, dt: float):
+def get_fixed_neighborhoods(swarm: list, num_neighborhoods: int) -> dict:
+    if num_neighborhoods is None: num_neighborhoods = 5
+    # this function encompass a fixed neighborhood relation between particles (no matter their distance)
+    neighborhoods = [[] for i in range(num_neighborhoods)]
+    for i in range(len(swarm)):
+        neighborhoods[i%num_neighborhoods].append(swarm[i])
+    neighbormatrix = {}
+    for ngb in neighborhoods:
+        for part in ngb:
+            neighbormatrix[part] = ngb
+    return neighbormatrix
+
+def PSO(grapher: callable, swarm: list, num_iters: int, dt: float, neighbor_setting="exclusive_global", neighbor_param=None):
+    # neighbor_param is 'number of fixed neighborhoods' OR 'neighbor_range', depending on neighbor_setting
 
     ########################################################################
     #                           SETUP NEIGHBORS                            #
@@ -86,17 +102,6 @@ def PSO(grapher: callable, swarm: list, num_iters: int, dt: float):
         if particle is best_particle: return almost_best_particle
         return best_particle
     
-    def get_fixed_neighborhoods(num_neighborhoods: int) -> dict:
-        # this function encompass a fixed neighborhood relation between particles (no matter their distance)
-        neighborhoods = [[] for i in range(num_neighborhoods)]
-        for i in range(len(swarm)):
-            neighborhoods[i%num_neighborhoods].append(swarm[i])
-        neighbormatrix = {}
-        for ngb in neighborhoods:
-            for part in ngb:
-                neighbormatrix[part] = ngb
-        return neighbormatrix
-    
     def get_inclusive_fixed_neighbor_function(neighbormatrix: dict) -> callable:
         def inclusive_fixed_neighbor_function(particle: Particle) -> Particle:
             return get_best_of_swarm(neighbormatrix[particle])
@@ -106,9 +111,16 @@ def PSO(grapher: callable, swarm: list, num_iters: int, dt: float):
         def exclusive_fixed_neighbor_function(particle: Particle) -> Particle:
             best = get_best_of_swarm(neighbormatrix[particle])
             if particle is best: return get_2nd_best_of_swarm(neighbormatrix[particle], best)
+            return best
         return exclusive_fixed_neighbor_function
     
-    neighbor_function = exclusive_global_neighbor_function
+    setting_map = {
+        "inclusive_global": inclusive_global_neighbor_function,
+        "exclusive_global": exclusive_global_neighbor_function,
+        "inclusive_fixed": get_inclusive_fixed_neighbor_function(get_fixed_neighborhoods(swarm, neighbor_param)),
+        "exclusive_fixed": get_exclusive_fixed_neighbor_function(get_fixed_neighborhoods(swarm, neighbor_param))
+    }
+    neighbor_function = setting_map[neighbor_setting]
     
     ########################################################################
     #                          PERFORM ITERATIONS                          #
@@ -133,16 +145,23 @@ if __name__ == '__main__':
     rastrigin_func = lambda x: 2 * 10 + ((x[0]**2 - 10 * np.cos(2 * np.pi * x[0])) + (x[1]**2 - 10 * np.cos(2 * np.pi * x[1])))
     # both functions seem to work perfectly fine; getting to (0,0) in about ~50 steps
 
+    # PARAMETERS -  you can change these!
     x_range = (-3, 3)
+    init_x_range = x_range
     x_shape = (2,)
     abc = (0.9, 2., 2.)
     num_particles = 20
     num_iters = 100
     dt = 0.1
-    func = rastrigin_func # only change this
-    swarm = init_swarm(num_particles, func, x_range, x_shape, abc)
-    PSO(grapher, swarm, num_iters, dt)
+    neighbor_protocol = "exclusive_global"
+    # choose from: "inclusive_global", "exclusive_global", "inclusive_fixed", "exclusive_fixed"
+    num_neighborhoods = None
+    func = rastrigin_func
+    particle_kwargs = {"remember_global_best_of_all_time": False} #True} # not sure if this is good?
 
+    # RUN SIMULATION
+    swarm = init_swarm(num_particles, func, init_x_range, x_shape, abc, **particle_kwargs)
+    PSO(grapher, swarm, num_iters, dt, neighbor_protocol, num_neighborhoods)
 
     # X, Y needed for the benchmark function
     x = np.arange(*x_range, 0.025)
@@ -151,7 +170,7 @@ if __name__ == '__main__':
 
     fig, ax = plt.subplots()
 
-    contour = ax.contourf(X, Y, func((X, Y)), 250, vmin=0, vmax=60, cmap=mpl.colormaps['jet'])
+    contour = ax.contourf(X, Y, func((X, Y)), 250, vmin=0, vmax=60, cmap='jet')
     ax.set_xlim(x_range)
     ax.set_ylim(x_range)
     ax.set_title("Benchmark function: Rastrigin")
