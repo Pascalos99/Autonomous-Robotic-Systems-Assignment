@@ -133,11 +133,17 @@ def PSO(grapher: callable, swarm: list, num_iters: int, dt: float, neighbor_sett
 
         swarm_iteration(swarm, neighbor_function, dt)
         grapher(xs = [p.pos for p in swarm], ys = [p.prf for p in swarm])
+        
+        for p in swarm:
+            p.a -= ((0.9 - 0.4) / num_iters)
+        # print(swarm[0].a)
 
 if __name__ == '__main__':
     xss = []
+    yss = []
     def grapher(xs, ys):
         xss.append(xs)
+        yss.append(ys)
 
     # DEFINE FUNCTION
     A, B = 0, 100
@@ -156,7 +162,7 @@ if __name__ == '__main__':
     neighbor_protocol = "exclusive_global"
     # choose from: "inclusive_global", "exclusive_global", "inclusive_fixed", "exclusive_fixed"
     num_neighborhoods = None
-    func = rastrigin_func
+    func = rosenbrock_func
     particle_kwargs = {"remember_global_best_of_all_time": False} #True} # not sure if this is good?
 
     # RUN SIMULATION
@@ -170,10 +176,11 @@ if __name__ == '__main__':
 
     fig, ax = plt.subplots()
 
-    contour = ax.contourf(X, Y, func((X, Y)), 250, vmin=0, vmax=60, cmap='jet')
+    # Rosenbrock vmax=1000, Rastrigin vmax=60
+    contour = ax.contourf(X, Y, func((X, Y)), 250, vmin=0, vmax=1000, cmap='jet') 
     ax.set_xlim(x_range)
     ax.set_ylim(x_range)
-    ax.set_title("Benchmark function: Rastrigin")
+    ax.set_title("Benchmark function: Rosenbrock")
     ax.set_xlabel("x values")
     ax.set_ylabel("y values")
     scat = ax.scatter([x[0] for x in xss[0]], [x[1] for x in xss[0]], c='w', marker="*")
@@ -183,7 +190,7 @@ if __name__ == '__main__':
         return scat, 
 
     ani = animation.FuncAnimation(fig, animate, frames=len(xss), interval=100, blit=True)
-    FFwriter = animation.FFMpegWriter(fps=10)
-    ani.save('rastrigin.mp4', writer=FFwriter)
+    # FFwriter = animation.FFMpegWriter(fps=10)
+    # ani.save('rastrigin.mp4', writer=FFwriter)
     
     plt.show()
