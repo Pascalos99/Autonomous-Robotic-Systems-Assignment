@@ -53,11 +53,16 @@ def init_swarm(num_particles: int, function: callable, x_range: tuple, x_shape: 
             function, abc, **kwargs))
     return swarm
 
-def swarm_iteration(swarm: list, neighbor_function: callable, dt: float) -> None:
+def swarm_iteration(swarm: list, neighbor_function: callable, dt: float, abc_delta=(0,0,0)) -> None:
     for particle in swarm:
         best_neighbor = neighbor_function(particle)
         particle.update_global_best(best_neighbor.pos, best_neighbor.prf)
         particle.update_velocity()
+
+        a_delta, b_delta, c_delta = abc_delta
+        particle.a = particle.a + a_delta
+        particle.b = particle.b + b_delta
+        particle.c = particle.c + c_delta
 
     for particle in swarm:
         particle.update_position(dt)
@@ -89,7 +94,20 @@ def get_fixed_neighborhoods(swarm: list, num_neighborhoods: int) -> dict:
             neighbormatrix[part] = ngb
     return neighbormatrix
 
-def PSO(grapher: callable, swarm: list, num_iters: int, dt: float, neighbor_setting="exclusive_global", neighbor_param=None):
+def get_inclusive_fixed_neighbor_function(neighbormatrix: dict) -> callable:
+    def inclusive_fixed_neighbor_function(particle: Particle) -> Particle:
+        return get_best_of_swarm(neighbormatrix[particle])
+    return inclusive_fixed_neighbor_function
+    
+def get_exclusive_fixed_neighbor_function(neighbormatrix: dict) -> callable:
+    def exclusive_fixed_neighbor_function(particle: Particle) -> Particle:
+        best = get_best_of_swarm(neighbormatrix[particle])
+        if particle is best: return get_2nd_best_of_swarm(neighbormatrix[particle], best)
+        return best
+    return exclusive_fixed_neighbor_function
+
+def PSO(grapher: callable, swarm: list, num_iters: int, dt: float, neighbor_setting="exclusive_global", neighbor_param=None,
+        abc_delta = lambda _: (0,0,0)):
     # neighbor_param is 'number of fixed neighborhoods' OR 'neighbor_range', depending on neighbor_setting
 
     ########################################################################
@@ -97,6 +115,7 @@ def PSO(grapher: callable, swarm: list, num_iters: int, dt: float, neighbor_sett
     ########################################################################
 
     best_particle, almost_best_particle = None, None
+    mag = lambda v: v.dot(v)
 
     def inclusive_global_neighbor_function(_) -> Particle:
         return best_particle
@@ -104,25 +123,27 @@ def PSO(grapher: callable, swarm: list, num_iters: int, dt: float, neighbor_sett
         if particle is best_particle: return almost_best_particle
         return best_particle
     
-    def get_inclusive_fixed_neighbor_function(neighbormatrix: dict) -> callable:
-        def inclusive_fixed_neighbor_function(particle: Particle) -> Particle:
-            return get_best_of_swarm(neighbormatrix[particle])
-        return inclusive_fixed_neighbor_function
+    def inclusive_geographic_neighbor_function(particle: Particle):
+        localswarm = [p for p in swarm if mag(particle.pos - p.pos) <= neighbor_param**2]
+        return get_best_of_swarm(localswarm)
     
-    def get_exclusive_fixed_neighbor_function(neighbormatrix: dict) -> callable:
-        def exclusive_fixed_neighbor_function(particle: Particle) -> Particle:
-            best = get_best_of_swarm(neighbormatrix[particle])
-            if particle is best: return get_2nd_best_of_swarm(neighbormatrix[particle], best)
-            return best
-        return exclusive_fixed_neighbor_function
+    def exclusive_geographical_neighbor_function(particle: Particle):
+        # will try not to return the particle itself as 'best neighbor', unless there are no neighbors
+        localswarm = [p for p in swarm if mag(particle.pos - p.pos) <= neighbor_param**2]
+        best = get_best_of_swarm(localswarm)
+        if len(localswarm) > 1 and particle is best:
+            return get_2nd_best_of_swarm(localswarm, best)
+        return best
     
     setting_map = {
-        "inclusive_global": inclusive_global_neighbor_function,
-        "exclusive_global": exclusive_global_neighbor_function,
-        "inclusive_fixed": get_inclusive_fixed_neighbor_function(get_fixed_neighborhoods(swarm, neighbor_param)),
-        "exclusive_fixed": get_exclusive_fixed_neighbor_function(get_fixed_neighborhoods(swarm, neighbor_param))
+        "inclusive_global": lambda: inclusive_global_neighbor_function,
+        "exclusive_global": lambda: exclusive_global_neighbor_function,
+        "inclusive_fixed": lambda: get_inclusive_fixed_neighbor_function(get_fixed_neighborhoods(swarm, neighbor_param)),
+        "exclusive_fixed": lambda: get_exclusive_fixed_neighbor_function(get_fixed_neighborhoods(swarm, neighbor_param)),
+        "inclusive_geographic": lambda: inclusive_geographic_neighbor_function,
+        "exclusive_geographic": lambda: exclusive_geographical_neighbor_function
     }
-    neighbor_function = setting_map[neighbor_setting]
+    neighbor_function = setting_map[neighbor_setting]()
     
     ########################################################################
     #                          PERFORM ITERATIONS                          #
@@ -133,11 +154,8 @@ def PSO(grapher: callable, swarm: list, num_iters: int, dt: float, neighbor_sett
         best_particle = get_best_of_swarm(swarm)
         almost_best_particle = get_2nd_best_of_swarm(swarm, best_particle)
 
-        swarm_iteration(swarm, neighbor_function, dt)
+        swarm_iteration(swarm, neighbor_function, dt, abc_delta = abc_delta(iter))
         grapher(xs = [p.pos for p in swarm], ys = [p.prf for p in swarm])
-        
-        for p in swarm:
-            p.a -= ((0.9 - 0.4) / num_iters)
 
 if __name__ == '__main__':
     xss, yss = [], []
@@ -154,22 +172,29 @@ if __name__ == '__main__':
     x_range = (-3, 3)
     init_x_range = x_range
     x_shape = (2,)
-    abc = (0.9, 2., 2.)
+    abc   = (0.9, 2., 2.) # a, b, and c at the start of the simulation
+    n_abc = (0.4, 2., 2.) # a, b, and c at the end of the simulation
     num_particles = 20
-    num_iters = 100
+    num_iters = 250
     dt = 0.1
-    neighbor_protocol = "exclusive_global" # choose from: "inclusive_global", "exclusive_global", "inclusive_fixed", "exclusive_fixed"
-    num_neighborhoods = None
-    particle_kwargs = {"remember_global_best_of_all_time": False} #True} # not sure if this is good?
+    neighbor_protocol = "exclusive_global"
+    # choose from: "inclusive_global"      "exclusive_global"
+    #              "inclusive_fixed"       "exclusive_fixed"
+    #              "inclusive_geographic"  "exclusive_geographic"
+    neighbor_param = 1.5
+    # if neighbor_protocol is 'geographic', neighbor_param is the geographic radius within which neighbors are defined
+    # if neighbor_protocol is 'fixed', neighbor_param is the number of fixed neighborhoods to create
+
+    # EXPERIMENTAL PARAMETERS
+    abc_delta = lambda i: tuple([(n_abc[i] - abc[i]) / num_iters for i in range(len(abc))])
+    particle_kwargs = {"remember_global_best_of_all_time": True} #True} # not sure if this is good?
     
-    # Set Benchmark Function
-    func = rosenbrock_func
+    # SET FUNCTION TO OPTIMIZE
+    func = rastrigin_func
 
     # RUN SIMULATION
     swarm = init_swarm(num_particles, func, init_x_range, x_shape, abc, **particle_kwargs)
-    PSO(grapher, swarm, num_iters, dt, neighbor_protocol, num_neighborhoods)
-
-
+    PSO(grapher, swarm, num_iters, dt, neighbor_protocol, neighbor_param, abc_delta)
 
     # ANIMATION
     # Create Benchmark Function
