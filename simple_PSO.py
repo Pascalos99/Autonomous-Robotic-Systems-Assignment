@@ -11,11 +11,12 @@ import matplotlib.gridspec as gridspec
 
 # Particle stores all necessary information to represent a single agent in the swarm
 class Particle:
-    def __init__(self, pos, vel, function: callable, abc: tuple, remember_global_best_of_all_time=False):
+    def __init__(self, pos, vel, function: callable, abc: tuple, remember_global_best_of_all_time=False, max_vel=100):
         self.update_listeners = []
 
         self.pos = pos
         self.vel = vel
+        self.max_vel = max_vel
         self.prf = function(pos)
         self.a, self.b, self.c = abc
         self.pbest = self.pos
@@ -106,13 +107,19 @@ def get_exclusive_fixed_neighbor_function(neighbormatrix: dict) -> callable:
         return best
     return exclusive_fixed_neighbor_function
 
-def PSO(grapher: callable, swarm: list, num_iters: int, dt: float, neighbor_setting="exclusive_global", neighbor_param=None,
-        abc_delta = lambda _: (0,0,0)):
+def PSO(grapher: callable, swarm: list, num_iters: int, dt: float, neighbor_setting: str = "exclusive_global", neighbor_param=False,
+        abc_delta: callable = lambda _: (0,0,0), stop_condition: callable = lambda iter,best_particle,second_best_particle: None):
     # neighbor_param is 'number of fixed neighborhoods' OR 'neighbor_range', depending on neighbor_setting
+    # algorithm stops when the stop-condition is reached OR when num_iters is reached
 
     ########################################################################
     #                           SETUP NEIGHBORS                            #
     ########################################################################
+
+    if grapher is None:
+        def no_grapher(xs, ys):
+            pass
+        grapher = no_grapher
 
     best_particle, almost_best_particle = None, None
     mag = lambda v: v.dot(v)
@@ -156,6 +163,8 @@ def PSO(grapher: callable, swarm: list, num_iters: int, dt: float, neighbor_sett
 
         swarm_iteration(swarm, neighbor_function, dt, abc_delta = abc_delta(iter))
         grapher(xs = [p.pos for p in swarm], ys = [p.prf for p in swarm])
+
+        if stop_condition(iter, best_particle, almost_best_particle): break
 
 if __name__ == '__main__':
     xss, yss = [], []
