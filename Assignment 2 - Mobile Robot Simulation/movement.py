@@ -1,10 +1,13 @@
 import pygame
 import numpy as np
 import datetime
+import pathlib
 import json
 import math
 pygame.init()
 pygame.font.init()
+
+working_directory = pathlib.Path(__file__).parent.absolute()
 
 WIDTH, HEIGHT = 1200, 800
 FPS = 60
@@ -173,7 +176,7 @@ class Simulation:
         self.win = pygame.display.set_mode((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
         self.map = Map()
-        self.map.load_map_from_json('./Assignment 2 - Mobile Robot Simulation/rect_map.json')
+        self.map.load_map_from_json(f'{working_directory}/rect_map.json')
         self.player = Player(self.map)
         
         self.sensitivity = 0.5
