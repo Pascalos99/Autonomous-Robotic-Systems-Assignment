@@ -11,7 +11,8 @@ FPS = 60
 FONT = pygame.font.SysFont('Consolas', 14)
 
 class Player:
-    def __init__(self):
+    def __init__(self, player_map):
+        self.map = player_map
         self.pos = np.array([WIDTH / 2, HEIGHT / 2], dtype=np.float64)
         self.vel = [0, 0]
         self.radius = 30
@@ -28,17 +29,68 @@ class Player:
         
     def step(self):
         new_pos = self.get_new_pose()
-        print(new_pos)
-        self.pos[0] = new_pos[0, 0]
-        self.pos[1] = new_pos[1, 0]
-        self.direction = new_pos[2, 0]
+        
+        # Get current and new position.
+        current_position = self.pos
+        new_position = np.array([new_pos[0, 0], new_pos[1, 0]])
+        direction = new_pos[2, 0]
         
         if self.vel[0] == self.vel[1]:
-            self.pos[0] += self.v * np.cos(self.direction)
-            self.pos[1] += self.v * np.sin(self.direction)
+            new_position[0] += self.v * np.cos(direction)
+            new_position[1] += self.v * np.sin(direction)
+    
+        # Check if position has moved.
+        if not np.array_equal(current_position, new_position):
+            # Check if new position is inside a wall or has passed through a wall.
+            
+            # Get lines for robot between current and new position.
+            player_lines = {
+                "left": np.array([current_position - [self.radius, 0], new_position - [self.radius, 0]]),
+                "right": np.array([current_position + [self.radius, 0], new_position + [self.radius, 0]]),
+                "upper": np.array([current_position + [0, self.radius], new_position + [0, self.radius]]),
+                "bottom": np.array([current_position - [0, self.radius], new_position - [0, self.radius]])
+            }
+            new_position_valid = np.array([])
+            for line_type, line in player_lines.items():
+                x1, y1, x2, y2 = line[0][0], line[0][1], line[1][0], line[1][1]
+                
+                # Check if line intersects with any wall.
+                for wall in self.map.lines:
+                    x3, y3, x4, y4 = wall[0][0], wall[0][1], wall[1][0], wall[1][1]
+                    
+                    # Calculate intersection point of line and wall using https://en.m.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment.
+                    t = np.divide((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4), (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
+                    u = np.divide((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2), (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
+                    
+                    if t >= 0 and t <= 1 and u >= 0 and u <= 1:
+                        # Line intersects with a wall.
+                        x_intercept, y_intercept = (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+                        
+                        # If no line intercepted with a wall before, set new position to intersection.
+                        if new_position_valid.size == 0:
+                            new_position_valid = np.array([x_intercept, y_intercept])
+                        
+                        # Check where to line belongs and set new position to collision point.
+                        if line_type == "left":
+                            new_position_valid[0] = x_intercept + (self.radius + 1) 
+                        elif line_type == "right":
+                            new_position_valid[0] = x_intercept - (self.radius + 1)
+                        elif line_type == "upper":
+                            new_position_valid[1] = y_intercept - (self.radius + 1)
+                        elif line_type == "bottom":
+                            new_position_valid[1] = y_intercept + (self.radius + 1)
+                            
+                # If a line intercepted with a wall, set new position to collision point.
+                if new_position_valid.size != 0:
+                    new_position = new_position_valid
+                      
+        # Update position and direction.
+        self.pos[0] = new_position[0]
+        self.pos[1] = new_position[1]
+        self.direction = direction
         
     def get_new_pose(self):
-        if self.ICC[0] == float('inf') or self.ICC[1] == float('inf'):
+        if self.ICC[0] == float('inf') or self.ICC[1] == float('inf') or self.ICC[0] == float('-inf') or self.ICC[1] == float('-inf'):
             return np.array([[self.pos[0]], [self.pos[1]], [self.direction]])
         
         m1 = np.array([
@@ -120,9 +172,9 @@ class Simulation:
     def __init__(self):
         self.win = pygame.display.set_mode((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
-        self.player = Player()
         self.map = Map()
         self.map.load_map_from_json('./Assignment 2 - Mobile Robot Simulation/rect_map.json')
+        self.player = Player(self.map)
         
         self.sensitivity = 0.5
         self.key_config = {
