@@ -1,9 +1,10 @@
-import pygame
-import numpy as np
 import datetime
-import pathlib
 import json
-import math
+import pathlib
+
+import numpy as np
+import pygame
+
 pygame.init()
 pygame.font.init()
 
@@ -20,8 +21,9 @@ class Player:
         self.vel = [0, 0]
         self.radius = 30
         self.num_sensors = 12
-        self.direction = 0
         self.vision_range = 200
+        self.sensor_lines = {key: [None, self.vision_range] for key in range(self.num_sensors)}
+        self.direction = 0
 
     def change_vel(self, left, right):
         self.vel[0] += left 
@@ -131,7 +133,35 @@ class Player:
         res = np.matmul(m1, m2) + m3
         res = np.nan_to_num(res)
         return res
-        
+
+    def calculate_sensor(self):
+        for sensor_number, sensor in self.sensor_lines.items():
+            no_intersect_counter = 0
+            sensor_line = sensor[0]
+            x1, y1, x2, y2 = sensor_line[0][0], sensor_line[0][1], sensor_line[1][0], sensor_line[1][1]
+
+            # Check if line intersects with any wall.
+            for wall in self.map.lines:
+                x3, y3, x4, y4 = wall[0][0], wall[0][1], wall[1][0], wall[1][1]
+
+                # Calculate intersection point of line and wall using https://en.m.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment.
+                t = np.divide((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4),
+                              (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
+                u = np.divide((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2),
+                              (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
+
+                if 0 <= t <= 1 and 0 <= u <= 1:
+                    no_intersect_counter = 0
+                    # Line intersects with a wall.
+                    x_intercept, y_intercept = (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+                    sensor_distance = ((x_intercept - x1) ** 2 + (y_intercept - y1) ** 2) ** 0.5
+                    self.sensor_lines[sensor_number][1] = sensor_distance
+                else:
+                    no_intersect_counter += 1
+                    if no_intersect_counter == len(self.map.lines):
+                        self.sensor_lines[sensor_number][1] = self.vision_range
+
+
     @property
     def v(self):
         return (self.vel[1] + self.vel[0]) / 2    
@@ -198,17 +228,18 @@ class Simulation:
         
         self.sensitivity = 0.5
         self.key_config = {
-            pygame.K_q: lambda: self.player.change_vel(self.sensitivity, 0),
-            pygame.K_a: lambda: self.player.change_vel(-self.sensitivity, 0),
+            pygame.K_q: lambda: self.player.change_vel(0, self.sensitivity),
+            pygame.K_a: lambda: self.player.change_vel(0, -self.sensitivity),
             pygame.K_w: lambda: self.player.change_vel(self.sensitivity, self.sensitivity),
             pygame.K_s: lambda: self.player.change_vel(-self.sensitivity, -self.sensitivity),
-            pygame.K_e: lambda: self.player.change_vel(0, self.sensitivity),
-            pygame.K_d: lambda: self.player.change_vel(0, -self.sensitivity),
+            pygame.K_e: lambda: self.player.change_vel(self.sensitivity, 0),
+            pygame.K_d: lambda: self.player.change_vel(-self.sensitivity, 0),
             pygame.K_x: lambda: self.player.reset_vel(),
         }
         
     def run(self):
         self.is_running = True
+        self.draw()
         while self.is_running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -221,6 +252,7 @@ class Simulation:
                         pass
             
             self.player.step()
+            self.player.calculate_sensor()
             self.draw()
             self.clock.tick(FPS)
         
@@ -252,17 +284,26 @@ class Simulation:
         # Draw all sensor lines
         angle = 2 * np.pi / self.player.num_sensors
         for i in range(self.player.num_sensors):
+            start_x = self.player.pos[0] + self.player.radius * np.sin(i * angle + self.player.direction)
+            start_y = self.player.pos[1] - self.player.radius * np.cos(i * angle + self.player.direction)
+            end_x = self.player.pos[0] + (self.player.vision_range + self.player.radius) * np.sin(
+                i * angle + self.player.direction)
+            end_y = self.player.pos[1] - (self.player.vision_range + self.player.radius) * np.cos(
+                i * angle + self.player.direction)
+
+            self.player.sensor_lines[i][0] = np.array([[start_x, start_y], [end_x, end_y]], dtype=np.float64)
+
             pygame.draw.line(self.win, '#dd0000', start_pos=[
-                self.player.pos[0] + self.player.radius * np.sin(i * angle+ self.player.direction),
-                self.player.pos[1] - self.player.radius * np.cos(i * angle + self.player.direction),
+                start_x,
+                start_y,
             ], end_pos=[
-                self.player.pos[0] + self.player.vision_range * np.sin(i * angle+ self.player.direction),
-                self.player.pos[1] - self.player.vision_range * np.cos(i * angle + self.player.direction),
+                end_x,
+                end_y,
             ], width=1)
         
         # Show motor numbers
-        x_text = FONT.render(f'l:{int(self.player.vel[0] / self.sensitivity)}', False, '#dddddd')
-        y_text = FONT.render(f'r:{int(self.player.vel[1] / self.sensitivity)}', False, '#dddddd')
+        x_text = FONT.render(f'l:{int(self.player.vel[1] / self.sensitivity)}', False, '#dddddd')
+        y_text = FONT.render(f'r:{int(self.player.vel[0] / self.sensitivity)}', False, '#dddddd')
         self.win.blit(x_text, dest=[
             self.player.pos[0] - x_text.get_width() // 2 + (self.player.radius // 2) * np.sin(self.player.direction),
             self.player.pos[1] - x_text.get_height() // 2 - (self.player.radius // 2) * np.cos(self.player.direction),
@@ -274,10 +315,13 @@ class Simulation:
 
         # Show Distance Numbers
         for i in range(self.player.num_sensors):
-            text = FONT.render(str(self.player.vision_range), False, '#dddddd')
+            distance = self.player.sensor_lines[i][1]
+            text = FONT.render(str(int(round(distance, 0))), False, '#dddddd')
             self.win.blit(text, dest=[
-                self.player.pos[0] - text.get_width() // 2 + (self.player.radius + 20) * np.sin(i * angle+ self.player.direction),
-                self.player.pos[1] - text.get_height() // 2 - (self.player.radius + 20) * np.cos(i * angle + self.player.direction),
+                self.player.pos[0] - text.get_width() // 2 + (self.player.radius + 20) * np.sin(
+                    i * angle + self.player.direction),
+                self.player.pos[1] - text.get_height() // 2 - (self.player.radius + 20) * np.cos(
+                    i * angle + self.player.direction),
             ])
         
     def clear(self):
