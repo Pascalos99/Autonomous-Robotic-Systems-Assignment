@@ -43,54 +43,71 @@ class Player:
             new_position[1] += self.v * np.sin(direction)
     
         # Check if position has moved.
-        if not np.array_equal(current_position, new_position):
+        if not np.array_equal(self.pos, new_position):
             # Check if new position is inside a wall or has passed through a wall.
-            
-            # Get lines for robot between current and new position.
-            player_lines = {
-                "left": np.array([current_position - [self.radius, 0], new_position - [self.radius, 0]]),
-                "right": np.array([current_position + [self.radius, 0], new_position + [self.radius, 0]]),
-                "upper": np.array([current_position + [0, self.radius], new_position + [0, self.radius]]),
-                "bottom": np.array([current_position - [0, self.radius], new_position - [0, self.radius]])
-            }
-            new_position_valid = np.array([])
-            for line_type, line in player_lines.items():
-                x1, y1, x2, y2 = line[0][0], line[0][1], line[1][0], line[1][1]
-                
-                # Check if line intersects with any wall.
-                for wall in self.map.lines:
-                    x3, y3, x4, y4 = wall[0][0], wall[0][1], wall[1][0], wall[1][1]
+            if self.position_intersects_wall(new_position):
+                # If so, move the player to the closest point on the wall.
+                # Number of steps to check between current and new position to find the closest point on the wall.
+                num_steps = 100
+                x_positions = np.linspace(current_position[0], new_position[0], num_steps)
+                y_positions = np.linspace(current_position[1], new_position[1], num_steps)
+                while self.position_intersects_wall(new_position):
+                    new_position = np.array([x_positions[-1], y_positions[-1]])
                     
-                    # Calculate intersection point of line and wall using https://en.m.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment.
-                    t = np.divide((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4), (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
-                    u = np.divide((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2), (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
+                    x_positions = np.delete(x_positions, -1)
+                    y_positions = np.delete(y_positions, -1)
                     
-                    if t >= 0 and t <= 1 and u >= 0 and u <= 1:
-                        # Line intersects with a wall.
-                        x_intercept, y_intercept = (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
-                        
-                        # If no line intercepted with a wall before, set new position to intersection.
-                        if new_position_valid.size == 0:
-                            new_position_valid = np.array([x_intercept, y_intercept])
-                        
-                        # Check where to line belongs and set new position to collision point.
-                        if line_type == "left":
-                            new_position_valid[0] = x_intercept + (self.radius + 1) 
-                        elif line_type == "right":
-                            new_position_valid[0] = x_intercept - (self.radius + 1)
-                        elif line_type == "upper":
-                            new_position_valid[1] = y_intercept - (self.radius + 1)
-                        elif line_type == "bottom":
-                            new_position_valid[1] = y_intercept + (self.radius + 1)
+                # Make robot move along the wall.
+                if np.array_equal(current_position, new_position):
+                    circle_intersections = []
+                    for line in self.map.lines:
+                        intersection = self.get_intersection_circle_line(line)
+                        if intersection is not None:
+                            circle_intersections.append(intersection)
                             
-                # If a line intercepted with a wall, set new position to collision point.
-                if new_position_valid.size != 0:
-                    new_position = new_position_valid
-                      
+                    if circle_intersections:
+                        print("Moving along wall")
+                     
         # Update position and direction.
         self.pos[0] = new_position[0]
         self.pos[1] = new_position[1]
         self.direction = direction
+        
+        
+    def position_intersects_wall(self, position):
+        player_lines = {
+            "left": np.array([self.pos - [self.radius, 0], position - [self.radius, 0]]),
+            "right": np.array([self.pos + [self.radius, 0], position + [self.radius, 0]]),
+            "upper": np.array([self.pos + [0, self.radius], position + [0, self.radius]]),
+            "bottom": np.array([self.pos - [0, self.radius], position - [0, self.radius]])
+        }
+        
+        for line in self.map.lines:
+            for player_line in player_lines.values():
+                intersection = self.get_intersection_lines(line, player_line)
+                if intersection is not None:
+                    return True
+                
+        return False
+    
+    
+    def get_intersection_circle_line(self, line):
+        pass
+        
+    def get_intersection_lines(self, line_1, line_2):
+        # Calculate intersection point between two lines using https://en.m.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment.
+        x1, y1, x2, y2 = line_1[0][0], line_1[0][1], line_1[1][0], line_1[1][1]
+        x3, y3, x4, y4 = line_2[0][0], line_2[0][1], line_2[1][0], line_2[1][1]
+        
+        t = np.divide((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4), (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
+        u = np.divide((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2), (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
+        
+        if t >= 0 and t <= 1 and u >= 0 and u <= 1:
+            x_intercept, y_intercept = (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+            
+            return np.array([x_intercept, y_intercept])
+        
+        return None
         
     def get_new_pose(self):
         if self.ICC[0] == float('inf') or self.ICC[1] == float('inf') or self.ICC[0] == float('-inf') or self.ICC[1] == float('-inf'):
