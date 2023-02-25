@@ -1,50 +1,53 @@
+import configparser
 import datetime
 import json
 import pathlib
 
 import numpy as np
 import pygame
-import configparser
 
 pygame.init()
 pygame.font.init()
 
 working_directory = pathlib.Path(__file__).parent.absolute()
+config = configparser.ConfigParser()
+config.read(f"{working_directory}/config.ini")
 
-WIDTH, HEIGHT = 1200, 800
-FPS = 60
+WIDTH, HEIGHT = float(config['PROGRAM']['window_width']), float(config['PROGRAM']['window_height'])
+FPS = float(config['PROGRAM']['fps'])
 FONT = pygame.font.SysFont('Consolas', 14)
+
 
 class Player:
     def __init__(self, player_map):
         self.map = player_map
         self.pos = np.array([WIDTH / 2, HEIGHT / 2], dtype=np.float64)
         self.vel = [0, 0]
-        self.radius = 30
-        self.num_sensors = 12
-        self.vision_range = 200
+        self.radius = int(config['BOT']['radius'])
+        self.num_sensors = int(config['BOT']['num_sensors'])
+        self.vision_range = int(config['BOT']['vision_range'])
         self.sensor_lines = {key: [None, self.vision_range] for key in range(self.num_sensors)}
-        self.direction = 0
+        self.direction = -float(config['BOT']['direction']) * np.pi / 180
 
     def change_vel(self, left, right):
-        self.vel[0] += left 
+        self.vel[0] += left
         self.vel[1] += right
-        
+
     def reset_vel(self):
         self.vel = [0, 0]
-        
+
     def step(self):
         new_pos = self.get_new_pose()
-        
+
         # Get current and new position.
         current_position = self.pos
         new_position = np.array([new_pos[0, 0], new_pos[1, 0]])
         direction = new_pos[2, 0]
-        
+
         if self.vel[0] == self.vel[1]:
             new_position[0] += self.v * np.cos(direction)
             new_position[1] += self.v * np.sin(direction)
-    
+
         # Check if position has moved.
         if not np.array_equal(self.pos, new_position):
             # Check if new position is inside a wall or has passed through a wall.
@@ -56,10 +59,10 @@ class Player:
                 y_positions = np.linspace(current_position[1], new_position[1], num_steps)
                 while self.position_intersects_wall(new_position):
                     new_position = np.array([x_positions[-1], y_positions[-1]])
-                    
+
                     x_positions = np.delete(x_positions, -1)
                     y_positions = np.delete(y_positions, -1)
-                    
+
                 # Make robot move along the wall.
                 if np.array_equal(current_position, new_position):
                     circle_intersections = []
@@ -67,16 +70,15 @@ class Player:
                         intersection = self.get_intersection_circle_line(line)
                         if intersection is not None:
                             circle_intersections.append(intersection)
-                            
+
                     if circle_intersections:
                         print("Moving along wall")
-                     
+
         # Update position and direction.
         self.pos[0] = new_position[0]
         self.pos[1] = new_position[1]
         self.direction = direction
-        
-        
+
     def position_intersects_wall(self, position):
         player_lines = {
             "left": np.array([self.pos - [self.radius, 0], position - [self.radius, 0]]),
@@ -84,53 +86,62 @@ class Player:
             "upper": np.array([self.pos + [0, self.radius], position + [0, self.radius]]),
             "bottom": np.array([self.pos - [0, self.radius], position - [0, self.radius]])
         }
-        
+
         for line in self.map.lines:
             for player_line in player_lines.values():
                 intersection = self.get_intersection_lines(line, player_line)
                 if intersection is not None:
                     return True
-                
+
         return False
-    
-    
+
     def get_intersection_circle_line(self, line):
         pass
-        
-    def get_intersection_lines(self, line_1, line_2):
-        # Calculate intersection point between two lines using https://en.m.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment.
+
+    @staticmethod
+    def get_intersection_lines(line_1, line_2):
+        # Calculate intersection point between two lines using:
+        # https://en.m.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment.
         x1, y1, x2, y2 = line_1[0][0], line_1[0][1], line_1[1][0], line_1[1][1]
         x3, y3, x4, y4 = line_2[0][0], line_2[0][1], line_2[1][0], line_2[1][1]
-        
-        t = np.divide((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4), (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
-        u = np.divide((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2), (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
-        
-        if t >= 0 and t <= 1 and u >= 0 and u <= 1:
+
+        t = np.divide(
+            (x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4),
+            (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        )
+        u = np.divide(
+            (x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2),
+            (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        )
+
+        if 0 <= t <= 1 and 0 <= u <= 1:
             x_intercept, y_intercept = (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
-            
             return np.array([x_intercept, y_intercept])
-        
+
         return None
-        
+
     def get_new_pose(self):
-        if self.ICC[0] == float('inf') or self.ICC[1] == float('inf') or self.ICC[0] == float('-inf') or self.ICC[1] == float('-inf'):
+        if (self.ICC[0] == float('inf') or
+                self.ICC[1] == float('inf') or
+                self.ICC[0] == float('-inf') or
+                self.ICC[1] == float('-inf')):
             return np.array([[self.pos[0]], [self.pos[1]], [self.direction]])
-        
+
         m1 = np.array([
-                [np.cos(self.w), -np.sin(self.w), 0],
-                [np.sin(self.w),  np.cos(self.w), 0],
-                [0,               0,              1]
-            ])
+            [np.cos(self.w), -np.sin(self.w), 0],
+            [np.sin(self.w), np.cos(self.w), 0],
+            [0, 0, 1]
+        ])
         m2 = np.array([
-                [self.pos[0] - self.ICC[0]],
-                [self.pos[1] - self.ICC[1]],
-                [self.direction]
-            ]) 
+            [self.pos[0] - self.ICC[0]],
+            [self.pos[1] - self.ICC[1]],
+            [self.direction]
+        ])
         m3 = np.array([
-                [self.ICC[0]],
-                [self.ICC[1]],
-                [self.w]
-            ])
+            [self.ICC[0]],
+            [self.ICC[1]],
+            [self.w]
+        ])
         res = np.matmul(m1, m2) + m3
         res = np.nan_to_num(res)
         return res
@@ -145,43 +156,50 @@ class Player:
             for wall in self.map.lines:
                 x3, y3, x4, y4 = wall[0][0], wall[0][1], wall[1][0], wall[1][1]
 
-                # Calculate intersection point of line and wall using https://en.m.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment.
-                t = np.divide((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4),
-                              (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
-                u = np.divide((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2),
-                              (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4))
+                # Calculate intersection point of line and wall using:
+                # https://en.m.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment.
+                t = np.divide(
+                    (x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4),
+                    (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+                )
+                u = np.divide(
+                    (x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2),
+                    (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+                )
 
                 if 0 <= t <= 1 and 0 <= u <= 1:
-                    no_intersect_counter = 0
                     # Line intersects with a wall.
+                    no_intersect_counter = 0
+                    # Calculate x and y coordinates of intersection point.
                     x_intercept, y_intercept = (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+                    # Calculate distance with Pythagorean theorem.
                     sensor_distance = ((x_intercept - x1) ** 2 + (y_intercept - y1) ** 2) ** 0.5
                     self.sensor_lines[sensor_number][1] = sensor_distance
                 else:
                     no_intersect_counter += 1
                     if no_intersect_counter == len(self.map.lines):
+                        # Sensor line did not intersect with any objects, so reset distance number to the vision range.
                         self.sensor_lines[sensor_number][1] = self.vision_range
-
 
     @property
     def v(self):
-        return (self.vel[1] + self.vel[0]) / 2    
-        
+        return (self.vel[1] + self.vel[0]) / 2
+
     @property
     def l(self):
         return 2 * self.radius
-        
+
     @property
     def R(self):
         try:
             return (self.l / 2) * ((self.vel[1] + self.vel[0]) / (self.vel[1] - self.vel[0]))
         except ZeroDivisionError:
             return float('inf')
-        
+
     @property
     def w(self):
         return (self.vel[1] - self.vel[0]) / self.l
-    
+
     @property
     def ICC(self):
         return [
@@ -189,9 +207,10 @@ class Player:
             self.pos[1] + self.R * np.cos(self.direction)
         ]
 
+
 class Map:
     def __init__(self):
-        self.lines = [] 
+        self.lines = []
 
     def add_line(self, pos_start, pos_end):
         self.lines.append([pos_start, pos_end])
@@ -218,7 +237,6 @@ class Map:
             self.lines.append([item['start_pos'], item['end_pos']])
 
 
-
 class Simulation:
     def __init__(self):
         self.win = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -226,8 +244,8 @@ class Simulation:
         self.map = Map()
         self.map.load_map_from_json(f'{working_directory}/rect_map.json')
         self.player = Player(self.map)
-        
-        self.sensitivity = 0.5
+
+        self.sensitivity = float(config['PROGRAM']['speed_step'])
         self.key_config = {
             pygame.K_q: lambda: self.player.change_vel(0, self.sensitivity),
             pygame.K_a: lambda: self.player.change_vel(0, -self.sensitivity),
@@ -237,31 +255,31 @@ class Simulation:
             pygame.K_d: lambda: self.player.change_vel(-self.sensitivity, 0),
             pygame.K_x: lambda: self.player.reset_vel(),
         }
-        
+
     def run(self):
-        self.is_running = True
-        while self.is_running:
+        is_running = True
+        while is_running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    self.is_running = False
+                    is_running = False
 
                 if event.type == pygame.KEYDOWN:
                     try:
                         self.key_config[event.key]()
                     except KeyError:
                         pass
-            
+
             self.player.step()
             self.draw()
             self.clock.tick(FPS)
-        
+
     def draw(self):
         self.clear()
         self.draw_fps()
         self.draw_map()
         self.draw_player()
         pygame.display.flip()
-    
+
     def draw_fps(self):
         fps_text = FONT.render(f'FPS: {int(self.clock.get_fps())}', False, '#00dd00')
         self.win.blit(fps_text, dest=[5, 5])
@@ -273,7 +291,7 @@ class Simulation:
     def draw_player(self):
         # Draw Main Circle
         pygame.draw.circle(self.win, '#00aacc', self.player.pos, self.player.radius)
-        
+
         # Draw Direction Line
         pygame.draw.line(self.win, '#000000', self.player.pos, (
             self.player.pos[0] + self.player.radius * np.sin(self.player.direction + 0.5 * np.pi),
@@ -302,7 +320,7 @@ class Simulation:
 
         # Calculate if one or more sensor line(s) intersect with an object, if so calculate the distance
         self.player.calculate_sensor()
-        
+
         # Show motor numbers
         x_text = FONT.render(f'l:{int(self.player.vel[1] / self.sensitivity)}', False, '#dddddd')
         y_text = FONT.render(f'r:{int(self.player.vel[0] / self.sensitivity)}', False, '#dddddd')
@@ -311,8 +329,10 @@ class Simulation:
             self.player.pos[1] - x_text.get_height() // 2 - (self.player.radius // 2) * np.cos(self.player.direction),
         ])
         self.win.blit(y_text, dest=[
-            self.player.pos[0] - y_text.get_width() // 2 + (self.player.radius // 2) * np.sin(np.pi + self.player.direction),
-            self.player.pos[1] - y_text.get_height() // 2 - (self.player.radius // 2) * np.cos(np.pi + self.player.direction),
+            (self.player.pos[0] - y_text.get_width() // 2 + (self.player.radius // 2)
+             * np.sin(np.pi + self.player.direction)),
+            (self.player.pos[1] - y_text.get_height() // 2 - (self.player.radius // 2)
+             * np.cos(np.pi + self.player.direction)),
         ])
 
         # Show Distance Numbers
@@ -320,12 +340,12 @@ class Simulation:
             distance = self.player.sensor_lines[i][1]
             text = FONT.render(str(int(round(distance, 0))), False, '#dddddd')
             self.win.blit(text, dest=[
-                self.player.pos[0] - text.get_width() // 2 + (self.player.radius + 20) * np.cos(
-                    i * angle - self.player.direction),
-                self.player.pos[1] - text.get_height() // 2 - (self.player.radius + 20) * np.sin(
-                    i * angle - self.player.direction),
+                (self.player.pos[0] - text.get_width() // 2 + (self.player.radius + 20)
+                 * np.cos(i * angle - self.player.direction)),
+                (self.player.pos[1] - text.get_height() // 2 - (self.player.radius + 20)
+                 * np.sin(i * angle - self.player.direction)),
             ])
-        
+
     def clear(self):
         self.win.fill('#232323')
 
