@@ -19,6 +19,7 @@ WIDTH, HEIGHT = float(config['PROGRAM']['window_width']), float(config['PROGRAM'
 FPS = float(config['PROGRAM']['fps'])
 FONT = pygame.font.SysFont('Consolas', 14)
 
+
 class Map:
     def __init__(self):
         self.lines = []
@@ -50,7 +51,7 @@ class Map:
 
 class Simulation:
     def __init__(self):
-        self.win = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.win = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
         self.map = Map()
         self.map.load_map_from_json(f'{working_directory}/maps/rect_map_2.json')
@@ -79,6 +80,8 @@ class Simulation:
                         self.key_config[event.key]()
                     except KeyError:
                         pass
+                if event.type == pygame.VIDEORESIZE:
+                    self.win = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
 
             self.player.step()
             self.draw()
@@ -149,13 +152,24 @@ class Simulation:
         # Show Distance Numbers
         for i in range(self.player.num_sensors):
             distance = self.player.sensor_lines[i][1]
-            text = FONT.render(str(int(round(distance, 0))), False, '#dddddd')
+            if not bool(int(config['PROGRAM']['sensor_data_separate'])):
+                text = FONT.render(str(int(round(distance, 0))), False, '#dddddd')
+            else:
+                text = FONT.render(str(i), False, '#dddddd')
             self.win.blit(text, dest=[
                 (self.player.pos[0] - text.get_width() // 2 + (self.player.radius + 20)
                  * np.cos(i * angle - self.player.direction)),
                 (self.player.pos[1] - text.get_height() // 2 - (self.player.radius + 20)
                  * np.sin(i * angle - self.player.direction)),
             ])
+
+        if bool(int(config['PROGRAM']['sensor_data_separate'])):
+            for i in range(self.player.num_sensors):
+                distance = self.player.sensor_lines[i][1]
+                text = FONT.render(f"Sensor {i}: {int(round(distance, 0))}", False, '#dddddd')
+                self.win.blit(text, dest=[
+                    self.win.get_width() - 150, 50 + i * 15
+                ])
 
     def clear(self):
         self.win.fill('#232323')
