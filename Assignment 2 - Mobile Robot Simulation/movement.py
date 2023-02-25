@@ -1,7 +1,7 @@
 import datetime
 import json
 import pathlib
-
+import math
 import numpy as np
 import pygame
 
@@ -53,30 +53,67 @@ class Player:
                 num_steps = 100
                 x_positions = np.linspace(current_position[0], new_position[0], num_steps)
                 y_positions = np.linspace(current_position[1], new_position[1], num_steps)
-                while self.position_intersects_wall(new_position):
+                while self.position_intersects_wall(new_position) and len(x_positions) > 0:
                     new_position = np.array([x_positions[-1], y_positions[-1]])
                     
                     x_positions = np.delete(x_positions, -1)
                     y_positions = np.delete(y_positions, -1)
                     
+                if len(x_positions) == 0:
+                    new_position = current_position
+                    
                 # Make robot move along the wall.
                 if np.array_equal(current_position, new_position):
                     circle_intersections = []
                     for line in self.map.lines:
-                        intersection = self.get_intersection_circle_line(line)
+                        intersection = self.get_intersection_circle_line(line, new_position, (self.radius + 1))
+                        
                         if intersection is not None:
-                            circle_intersections.append(intersection)
+                            circle_intersections.append([line, intersection])
                             
                     if circle_intersections:
-                        print("Moving along wall")
-                     
-        # Update position and direction.
+                        new_position = current_position
+                        for intersection in circle_intersections:
+                            # Get the wall that collides with the robot and the collision point.
+                            wall = intersection[0]
+                            collision_point = intersection[1][0]
+                            
+                            # Get wall direction and unit vector.
+                            wall_direction = np.array([wall[1][0] - wall[0][0], wall[1][1] - wall[0][1]])
+                            wall_direction_unit = wall_direction / np.linalg.norm(wall_direction)
+                            
+                            # Calculate the velocity of the robot and where it should move to.
+                            velocity = (self.vel[0] + self.vel[1]) / 2
+                            velocity_vector = np.array([velocity * np.cos(direction), velocity * np.sin(direction)])
+
+                            # Calculate the parallel velocity.
+                            parallel_velocity = np.dot(velocity_vector, wall_direction_unit)
+                            velocity_vector = parallel_velocity * wall_direction_unit
+                            
+                            # Calculate the new position.
+                            new_position = new_position + velocity_vector
+                        
+                        # Check if new position is inside a wall or has passed through a wall.
+                        num_steps = 100
+                        x_positions = np.linspace(current_position[0], new_position[0], num_steps)
+                        y_positions = np.linspace(current_position[1], new_position[1], num_steps)
+                        while self.position_intersects_wall(new_position) == True and len(x_positions) > 0:
+                            new_position = np.array([x_positions[-1], y_positions[-1]])
+                            
+                            x_positions = np.delete(x_positions, -1)
+                            y_positions = np.delete(y_positions, -1)
+                        
+                        if len(x_positions) == 0:
+                            new_position = current_position
+                        
+        # Update position and direction.awwd
         self.pos[0] = new_position[0]
         self.pos[1] = new_position[1]
         self.direction = direction
         
         
     def position_intersects_wall(self, position):
+        # Check if the robot intersects with any of the walls using lines.
         player_lines = {
             "left": np.array([self.pos - [self.radius, 0], position - [self.radius, 0]]),
             "right": np.array([self.pos + [self.radius, 0], position + [self.radius, 0]]),
@@ -90,11 +127,64 @@ class Player:
                 if intersection is not None:
                     return True
                 
+        # Lastly, check if the robot intersects with any of the walls using circle at location.
+        for line in self.map.lines:
+            intersection = self.get_intersection_circle_line(line, position, self.radius)
+            if intersection is not None and len(intersection) > 1:
+                return True
+                
         return False
     
     
-    def get_intersection_circle_line(self, line):
-        pass
+    def get_intersection_circle_line(self, line, position, radius):
+        # Calculate the distance between the center of the circle and the line
+        x_diff = line[1][0] - line[0][0]
+        y_diff = line[1][1] - line[0][1]
+        num = abs(y_diff * position[0] - x_diff * position[1] + line[1][0] * line[0][1] - line[1][1] * line[0][0])
+        den = np.sqrt(y_diff**2 + x_diff**2)
+
+        if num / den > radius:
+            # The circle and line segment do not intersect.
+            return None
+
+        # Calculate the closest point on the line to the center of the circle
+        u = ((position[0] - line[0][0]) * x_diff + (position[1] - line[0][1]) * y_diff) / (den**2)
+        closest_point = np.array([line[0][0] + u * x_diff, line[0][1] + u * y_diff])
+
+        # Calculate the distance between the closest point and the center of the circle
+        dist_to_closest_point = np.sqrt((closest_point[0] - position[0])**2 + (closest_point[1] - position[1])**2)
+
+        if dist_to_closest_point > radius:
+            # Distance between the closest point and the center of the circle is greater than the radius of the circle.
+            return None
+
+        # Calculate the distance between the intersection points and the closest point
+        dist_to_intersection = np.sqrt(radius**2 - dist_to_closest_point**2)
+
+        # Calculate the intersection points
+        if y_diff == 0: 
+            # Horizontal line
+            intersection_1 = np.array([closest_point[0] + dist_to_intersection, closest_point[1]])
+            intersection_2 = np.array([closest_point[0] - dist_to_intersection, closest_point[1]])
+        elif x_diff == 0:
+            # Vertical line
+            intersection_1 = np.array([closest_point[0], closest_point[1] + dist_to_intersection])
+            intersection_2 = np.array([closest_point[0], closest_point[1] - dist_to_intersection])
+        else: 
+            # Diagonal line
+            m = y_diff / x_diff
+            b = line[0][1] - m * line[0][0]
+            x_1 = closest_point[0] + (dist_to_intersection / np.sqrt(1 + m**2))
+            x_2 = closest_point[0] - (dist_to_intersection / np.sqrt(1 + m**2))
+            intersection_1 = np.array([x_1, m * x_1 + b])
+            intersection_2 = np.array([x_2, m * x_2 + b])
+
+        # Return the intersection points
+        if np.array_equal(intersection_1, intersection_2):
+            return [intersection_1]
+        else:
+            return [intersection_1, intersection_2]
+        
         
     def get_intersection_lines(self, line_1, line_2):
         # Calculate intersection point between two lines using https://en.m.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment.
@@ -110,6 +200,17 @@ class Player:
             return np.array([x_intercept, y_intercept])
         
         return None
+        
+        
+    def point_on_line_segment(self, line, point):
+        x1, y1 = line[0][0], line[0][1]
+        x2, y2 = line[1][0], line[1][1]
+        
+        if min(x1, x2) <= point[0] <= max(x1, x2) and min(y1, y2) <= point[1] <= max(y1, y2):
+            return True
+        
+        return False
+        
         
     def get_new_pose(self):
         if self.ICC[0] == float('inf') or self.ICC[1] == float('inf') or self.ICC[0] == float('-inf') or self.ICC[1] == float('-inf'):
@@ -223,7 +324,7 @@ class Simulation:
         self.win = pygame.display.set_mode((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
         self.map = Map()
-        self.map.load_map_from_json(f'{working_directory}/rect_map.json')
+        self.map.load_map_from_json(f'{working_directory}/rect_map_2.json')
         self.player = Player(self.map)
         
         self.sensitivity = 0.5
