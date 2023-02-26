@@ -45,6 +45,9 @@ class Player:
         if not np.array_equal(self.pos, new_position):
             # Check if new position is inside a wall or has passed through a wall.
             if self.position_intersects_wall(new_position):
+                # Save the intended new position.
+                intended_new_position = new_position
+                
                 # If so, move the player to the closest point on the wall.
                 # Number of steps to check between current and new position to find the closest point on the wall.
                 num_steps = 100
@@ -69,6 +72,30 @@ class Player:
                             circle_intersections.append([line, intersection])
 
                     if circle_intersections:
+                        # Clear intersections which are not in the movement direction of the robot.
+                        # Only needs to be done if the robot is colliding with more than one wall.
+                        if len(circle_intersections) > 1:
+                            correct_intersections = []
+                            
+                            x1, y1 = current_position[0], current_position[1]
+                            x2, y2 = intended_new_position[0], intended_new_position[1]
+                            for intersection in circle_intersections:
+                                # Check if the wall intersects with the original movement direction of the robot.
+                                wall = intersection[0]
+                                
+                                x3, y3 = wall[0][0], wall[0][1]
+                                x4, y4 = wall[1][0], wall[1][1]
+                                
+                                denominator = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
+                                if denominator != 0:
+                                    u = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denominator
+                                    if u > 0:
+                                        # Wall intersects with the original movement direction of the robot so add it to the correct intersections.
+                                        correct_intersections.append(intersection)
+                            
+                            # Replace the circle intersections with the correct ones.
+                            circle_intersections = correct_intersections
+                        
                         new_position = current_position
                         for intersection in circle_intersections:
                             # Get the wall that collides with the robot and the collision point.
