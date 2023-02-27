@@ -6,6 +6,7 @@
 * Pygame setup
 * Basic model
 * Motion model
+* Map Creator Tool
 
 ### Cortenraede, Cédric
 * Collision model
