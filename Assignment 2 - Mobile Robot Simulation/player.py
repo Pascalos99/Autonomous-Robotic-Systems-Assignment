@@ -135,29 +135,6 @@ class Player:
         self.pos[1] = new_position[1]
         self.direction = direction
 
-    def position_intersects_wall(self, position: np.ndarray):
-        # Check if the robot intersects with any of the walls using lines.
-        player_lines = {
-            "left": np.array([self.pos - [self.radius, 0], position - [self.radius, 0]]),
-            "right": np.array([self.pos + [self.radius, 0], position + [self.radius, 0]]),
-            "upper": np.array([self.pos + [0, self.radius], position + [0, self.radius]]),
-            "bottom": np.array([self.pos - [0, self.radius], position - [0, self.radius]])
-        }
-
-        for line in self.map.lines:
-            for player_line in player_lines.values():
-                intersection = self.get_intersection_lines(line, player_line)
-                if intersection is not None:
-                    return True
-
-        # Lastly, check if the robot intersects with any of the walls using circle at location.
-        for line in self.map.lines:
-            intersection = self.get_intersection_circle_line(line, position, self.radius)
-            if intersection is not None and len(intersection) > 1:
-                return True
-
-        return False
-
     def get_new_pose(self):
         if (self.ICC[0] == float('inf') or
                 self.ICC[1] == float('inf') or
@@ -183,6 +160,29 @@ class Player:
         res = np.matmul(m1, m2) + m3
         res = np.nan_to_num(res)
         return res
+
+    def position_intersects_wall(self, position: np.ndarray):
+        # Check if the robot intersects with any of the walls using lines.
+        player_lines = {
+            "left": np.array([self.pos - [self.radius, 0], position - [self.radius, 0]]),
+            "right": np.array([self.pos + [self.radius, 0], position + [self.radius, 0]]),
+            "upper": np.array([self.pos + [0, self.radius], position + [0, self.radius]]),
+            "bottom": np.array([self.pos - [0, self.radius], position - [0, self.radius]])
+        }
+
+        for line in self.map.lines:
+            for player_line in player_lines.values():
+                intersection = self.get_intersection_lines(line, player_line)
+                if intersection is not None:
+                    return True
+
+        # Lastly, check if the robot intersects with any of the walls using circle at location.
+        for line in self.map.lines:
+            intersection = self.get_intersection_circle_line(line, position, self.radius)
+            if intersection is not None and len(intersection) > 1:
+                return True
+
+        return False
 
     def calculate_sensor(self):
         for sensor_number, sensor in self.sensor_lines.items():

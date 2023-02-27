@@ -1,6 +1,8 @@
 import pygame
 import json
 import datetime
+import random
+import os
 from shapely.geometry import LineString
 pygame.init()
 
@@ -23,10 +25,13 @@ class Map:
             })
 
         if not filename:
-            filename = str(datetime.datetime.now())[:19]
+            # filename = str(datetime.datetime.now())[:19]
+            path = './maps/'
+            num_files = num_files = len([f for f in os.listdir(path)if os.path.isfile(os.path.join(path, f))])
+            filename = f'map_{num_files+1}'
             filename = filename.replace("-", "").replace(":", "").replace(" ", "_")
 
-        with open(filename + '.json', 'w') as outfile:
+        with open('./maps/' + filename + '.json', 'w') as outfile:
             outfile.write(json.dumps(export, indent=2))
 
     def load_map_from_json(self, filename):
