@@ -15,32 +15,46 @@ class Parameter:
 
 class Genotype:
     def __init__(self, **parameters):
+        # note that all patameters must be instances of the Parameter class
         self.params = list(parameters.keys())
         for par in self.params:
             self.__dict__[par] = parameters[par]
+
+        self.__init_kwargs = {par: {} for par in self.params}
+        self.__mutate_kwargs = {par: {} for par in self.params}
+        self.__crossover_kwargs = {par: {} for par in self.params}
 
     def get_param(self, param_name) -> Parameter:
         if not param_name in self.params:
             raise Warning("param %s not in available params for %s"%(param_name, self))
         return self.__dict__[param_name]
     
+    def alter_init(self, **kwargs_per_param):
+        self.__init_kwargs = {par: kwargs_per_param[par] if par in kwargs_per_param.keys() else {} for par in self.params}
+    
+    def alter_mutate(self, **kwargs_per_param):
+        self.__mutate_kwargs = {par: kwargs_per_param[par] if par in kwargs_per_param.keys() else {} for par in self.params}
+
+    def alter_crossover(self, **kwargs_per_param):
+        self.__crossover_kwargs = {par: kwargs_per_param[par] if par in kwargs_per_param.keys() else {} for par in self.params}
+    
     def get_individual(self) -> dict:
-        return {param: self.__dict__[param].init() for param in self.params}
+        return {param: self.__dict__[param].init(**self.__init_kwargs[param]) for param in self.params}
     
     def get_population(self, population_size) -> dict:
-        return {param: [self.__dict__[param].init() for _ in range(population_size)] for param in self.params}
+        return {param: [self.__dict__[param].init(**self.__init_kwargs[param]) for _ in range(population_size)] for param in self.params}
     
     def mutate_all(self, population, indices=None) -> None:
         if indices is None:
             indices = range(len(population))
         for param in self.params:
             for i in indices:
-                population[param][i] = self.__dict__[param].mutate(population[param][i])
+                population[param][i] = self.__dict__[param].mutate(population[param][i], **self.__mutate_kwargs[param])
     
     def crossover(self, population: dict, pairs: list) -> dict:
         # pairs is a list of 2-tuples of indices of individuals to be crossed over
         # the returned dictionary is in order of the given pairs and contains their unmutated offspring
-        return {param: [self.__dict__[param].crossover(population[param][p1], population[param][p2]) for p1, p2 in pairs] for param in self.params}
+        return {param: [self.__dict__[param].crossover(population[param][p1], population[param][p2], **self.__crossover_kwargs[param]) for p1, p2 in pairs] for param in self.params}
     
     def join_pops(self, *pops) -> dict:
         all_params = self.params
@@ -53,11 +67,54 @@ class Genotype:
                 else:
                     population[param] = population[param] + [None for _ in range(len(pop[list(pop.keys())[0]]))]
         return population
+    
+    # missing:
+    # * selection protocol
+    # * genetic algorithm framework
+    # * fitness sorting
+
+class Fitness:
+    def __init__(self, compute: callable, minimize=False):
+        self.__compute = compute
+        self.minimize = minimize
+
+    def individual(self, individual: dict, recompute=False):
+        if (not recompute) and ('fitness' in individual.keys()):
+            fit = individual['fitness']
+            if fit is not None: return fit
+        individual['fitness'] = self.__compute(individual)
+        return individual['fitness']
+    
+    def compute(self, population: dict, recompute_all=False) -> None:
+        if (not 'fitness' in population.keys()) or recompute_all:
+            population['fitness'] = [None for i in range(len(population[list(population.keys())[0]]))]
+        population['fitness'] = [population['fitness'][i] if population['fitness'][i] is not None else self.__compute({param: population[param][i] for param in population.keys()}) for i in range(len(population['fitness']))]
+
+    def population(self, population: dict, recompute=False):
+        self.compute_pop_fitness(population, recompute)
+        return population['fitness']
+    
+    def sort_population(self, population: dict, recompute=False):
+        self.compute(population, recompute)
+        # TODO how do you sort this without using pandas?
+
+class Selection:
+    def __init__(self):
+        pass
+    # TODO implement selection
+
+class GeneticAlgo:
+    def __init__(self, fitness: Fitness, genotype: Genotype, selection: Selection, population_size: int):
+        pass
+    # TODO implement GA 
         
 if __name__ == '__main__':
     print('printing pop 1')
-    numeric = Parameter(lambda: int(100*random.random()), lambda x: x + int(random.random()*10), lambda x, y: (x + y)//2)
+    def init_numeric(l=100):
+        return int(l * random.random())
+    numeric = Parameter(init_numeric, lambda x: x + int(random.random()*10), lambda x, y: (x + y)//2)
     simplegeno = Genotype(x=numeric, y=numeric)
+    simplegeno.alter_init(x={'l':200})
     pop1 = simplegeno.get_population(10)
     pop2 = simplegeno.get_population(5)
     print(pop1)
