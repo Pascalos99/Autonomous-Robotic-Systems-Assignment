@@ -54,7 +54,7 @@ class Simulation:
         self.win = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
         self.map = Map()
-        self.map.load_map_from_json(f'{working_directory}/maps/map_4.json')
+        self.map.load_map_from_json(f'{working_directory}/maps/rect_map.json')
         self.player = Player(self.map)
 
         self.sensitivity = float(config['PROGRAM']['speed_step'])
