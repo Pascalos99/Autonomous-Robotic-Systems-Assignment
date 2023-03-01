@@ -91,22 +91,47 @@ class Fitness:
         population['fitness'] = [population['fitness'][i] if population['fitness'][i] is not None else self.__compute({param: population[param][i] for param in population.keys()}) for i in range(len(population['fitness']))]
 
     def population(self, population: dict, recompute=False):
-        self.compute_pop_fitness(population, recompute)
+        self.compute(population, recompute)
         return population['fitness']
     
-    def sort_population(self, population: dict, recompute=False):
+    def sort_population(self, population: dict, recompute=False) -> None:
         self.compute(population, recompute)
-        # TODO how do you sort this without using pandas?
-
-class Selection:
-    def __init__(self):
-        pass
-    # TODO implement selection
+        sorted_index = sorted(range(len(population['fitness'])), key=lambda i: population['fitness'][i])
+        for par in population.keys():
+            population[par] = [population[par][i] for i in sorted_index]
 
 class GeneticAlgo:
-    def __init__(self, fitness: Fitness, genotype: Genotype, selection: Selection, population_size: int):
-        pass
-    # TODO implement GA 
+    def __init__(self, fitness: Fitness, genotype: Genotype, selection: callable, population_size: int):
+        # selection(population) -> survivors
+        self.fitness = fitness
+        self.genotype = genotype
+        self.selection = selection
+        self.popsize = population_size
+        self.selectionpars = {}
+        self.population = None
+        self.iter = 0
+        self.mut_rate = 1.
+        self.crossover = True
+
+    def initialize(self, **init_kwargs):
+        self.genotype.alter_init(**init_kwargs)
+        self.population = self.genotype.get_population(self.popsize)
+    
+    def alter_mutation(self, master_mutation_rate=1, **mutation_kwargs):
+        self.mut_rate = master_mutation_rate
+        self.genotype.alter_mutate(**mutation_kwargs)
+    
+    def alter_crossover(self, enable_crossover=True, **crossover_kwargs):
+        self.crossover = enable_crossover
+        self.genotype.alter_crossover(**crossover_kwargs)
+    
+    def iterate(self, num_iters):
+        for i in range(num_iters):
+            self.fitness.sort_population(self.population, i==0)
+            nextpop = self.selection(self.population)
+            # TODO implement pairing selection
+            # TODO implement crossover and mutation
+            self.iter += 1
         
 if __name__ == '__main__':
     print('printing pop 1')
