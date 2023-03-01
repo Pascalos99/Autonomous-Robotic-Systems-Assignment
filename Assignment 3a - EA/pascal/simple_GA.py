@@ -6,9 +6,52 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.gridspec as gridspec
-from genetic_algorithm import Parameter, Genotype, Fitness, GeneticAlgorithm
-        
+from genetic_algorithm import *
+
+# simple n=2
+def init_numeric(min=-3, max=3):
+    return min + (max - min) * random.random()
+def mut_numeric(val, sigma=0.5):
+    return val + random.gauss(0, sigma)
+def cross_numeric(val1, val2):
+    return (val1 + val2) / 2.
+numeric = Parameter(init_numeric, mut_numeric, cross_numeric)
+var2geno = Genotype(x=numeric, y=numeric)
+
+def basic_n2_GA(fitness, popsize=100, init_x=(-3,3), init_y=(-3,3), avoid_asex=True, keep_old_population=True, elitist_percent=0.3,
+             lucky_chance=0.1, sigma_x = 0.5, sigma_y = 0.5):
+    GA = GeneticAlgorithm(fitness, var2geno, random_pairing, elitist_selection, population_size=popsize)
+    GA.initialize(x={'min':init_x[0], 'max':init_x[1]}, y={'min':init_y[0], 'max':init_y[1]})
+    GA.alter_pairing(avoid_asex=avoid_asex)
+    GA.alter_crossover(keep_old_population=keep_old_population)
+    GA.alter_selection(elitist_percent=elitist_percent, lucky_chance=lucky_chance)
+    GA.alter_mutation(x={'sigma':sigma_x}, y={'sigma':sigma_y})
+    return GA
+
 if __name__ == '__main__':
+    A, B = 0, 100
+    rosenbrock_fitness = Fitness(lambda pop: (A - pop['x'])**2 + B * (pop['y'] - pop['x']**2)**2, minimize=True)
+    rastrigin2_fitness = Fitness(lambda pop: 2 * 10 + ((pop['x']**2 - 10 * np.cos(2 * np.pi * pop['x'])) + (pop['y']**2 - 10 * np.cos(2 * np.pi * pop['y']))), minimize=True)
+    GA_rosenbrock = basic_n2_GA(rosenbrock_fitness, popsize=100)
+    GA_rastrigin2 = basic_n2_GA(rastrigin2_fitness, popsize=100)
+
+    # Rosenbrock
+    fitness = GA_rosenbrock.iterate(50)
+    plt.plot([sum(f)/len(f) for f in fitness], label='average fitness')
+    plt.plot([f[0] for f in fitness], label='top fitness')
+    plt.legend()
+    plt.title('Rosenbrock')
+    plt.show()
+
+    # Rastrigin
+    fitness = GA_rastrigin2.iterate(50)
+    plt.plot([sum(f)/len(f) for f in fitness], label='average fitness')
+    plt.plot([f[0] for f in fitness], label='top fitness')
+    plt.legend()
+    plt.title('Rastrigin 2D')
+    plt.show()
+
+if __name__ == '__main__' and False:
     print('printing pop 1')
     def init_numeric(l=100):
         return int(l * random.random())

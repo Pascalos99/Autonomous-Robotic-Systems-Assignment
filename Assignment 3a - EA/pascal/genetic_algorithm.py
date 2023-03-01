@@ -1,3 +1,5 @@
+import random
+
 class Parameter:
     def __init__(self, init: callable, mutate: callable, crossover: callable):
         self.init = init # init() -> some_type
@@ -66,6 +68,7 @@ class Genotype:
 
 class Fitness:
     def __init__(self, compute: callable, minimize=False):
+        # compute({individual}) -> double
         self.__compute = compute
         self.minimize = minimize
 
@@ -93,8 +96,8 @@ class Fitness:
 
 class GeneticAlgorithm:
     def __init__(self, fitness: Fitness, genotype: Genotype, pairing: callable, selection: callable, population_size: int):
-        # selection(population) -> survivors
-        # pairing(population, size) -> [(parent1, parent2), ...] (len = size)
+        # selection(population: dict) -> survivors: dict
+        # pairing(population: dict, size: int) -> [(p1_index, p2_index), ...]: list(tuple) w/ len = size
         self.fitness = fitness
         self.genotype = genotype
         self.pairing = pairing
@@ -131,18 +134,18 @@ class GeneticAlgorithm:
         self.pairingpars = pairing_kwargs
     
     def iterate(self, num_iters, record_fitness=True, record_population=False):
-        fitness_record = [[] for _ in range(num_iters)]
-        populat_record = [{} for _ in range(num_iters)]
+        fitness_record = []
+        populat_record = []
 
         for i in range(num_iters):
             # determine population fitness:
             self.fitness.sort_population(self.population, i==0)
-            if record_fitness: fitness_record.append(self.population['fitness'])
-            if record_population: populat_record.append(self.population)
+            if record_fitness: fitness_record.append(list(self.population['fitness']))
+            if record_population: populat_record.append(dict(self.population))
             # create offspring:
             survivepop = self.selection(self.population, **self.selectionpars)
             numoffspring = self.popsize
-            if self.keep_pops: numoffspring -= len(survivepop)
+            if self.keep_pops: numoffspring -= len(survivepop[list(survivepop.keys())[0]])
             offspring = self.genotype.crossover(survivepop, self.pairing(survivepop, numoffspring, **self.pairingpars))
             # mutate offspring:
             mutate_indices = None
@@ -155,8 +158,31 @@ class GeneticAlgorithm:
             else: self.population = offspring
             self.iter += 1
 
+        self.fitness.sort_population(self.population, False)
         if record_fitness: fitness_record.append(self.population['fitness'])
         if record_population: populat_record.append(self.population)
         if record_fitness and not record_population: return fitness_record
         if not record_fitness and record_population: return populat_record
         if record_fitness and record_population: return fitness_record, populat_record
+
+def elitist_selection(population, elitist_percent=0.3, lucky_chance=0.1):
+    popsize = len(population[list(population.keys())[0]])
+    elitists = int(round(elitist_percent * popsize))
+    pop_elitist = {par: population[par][:elitists] for par in population.keys()}
+    index_lucky = random.sample(range(elitists, popsize), int(round(lucky_chance * (popsize - elitists))))
+    return {par: pop_elitist[par] + [population[par][i] for i in index_lucky] for par in population.keys()}
+    
+def random_asex(population, size):
+    popsize = len(population[list(population.keys())[0]])
+    return [(c, c) for c in [random.choice(range(popsize)) for _ in range(size)]]
+
+def random_pairing(population, size, avoid_asex=True):
+    popsize = len(population[list(population.keys())[0]])
+    res = [(random.choice(range(popsize)), random.choice(range(popsize))) for _ in range(size)]
+    if not avoid_asex: return res
+    for i in range(size):
+        p1, p2 = res[i]
+        while p1 == p2:
+            p1, p2 = random.choice(range(popsize)), random.choice(range(popsize))
+        res[i] = (p1, p2)
+    return res
