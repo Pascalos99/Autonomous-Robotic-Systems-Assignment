@@ -28,67 +28,17 @@ def basic_n2_GA(fitness, popsize=100, init_x=(-3,3), init_y=(-3,3), avoid_asex=T
     GA.alter_mutation(x={'sigma':sigma_x}, y={'sigma':sigma_y})
     return GA
 
-if __name__ == '__main__':
-    A, B = 0, 100
-    rosenbrock_fitness = Fitness(lambda pop: (A - pop['x'])**2 + B * (pop['y'] - pop['x']**2)**2, minimize=True)
-    rastrigin2_fitness = Fitness(lambda pop: 2 * 10 + ((pop['x']**2 - 10 * np.cos(2 * np.pi * pop['x'])) + (pop['y']**2 - 10 * np.cos(2 * np.pi * pop['y']))), minimize=True)
-    GA_rosenbrock = basic_n2_GA(rosenbrock_fitness, popsize=100)
-    GA_rastrigin2 = basic_n2_GA(rastrigin2_fitness, popsize=100)
+def animation_visualizer(xss, yss, rosenbrock=True):
+    num_particles = len(xss[0])
 
-    # Rosenbrock
-    fitness = GA_rosenbrock.iterate(50)
-    plt.plot([sum(f)/len(f) for f in fitness], label='average fitness')
-    plt.plot([f[0] for f in fitness], label='top fitness')
-    plt.legend()
-    plt.title('Rosenbrock')
-    plt.show()
-
-    # Rastrigin
-    fitness = GA_rastrigin2.iterate(50)
-    plt.plot([sum(f)/len(f) for f in fitness], label='average fitness')
-    plt.plot([f[0] for f in fitness], label='top fitness')
-    plt.legend()
-    plt.title('Rastrigin 2D')
-    plt.show()
-
-if __name__ == '__main__' and False:
-    print('printing pop 1')
-    def init_numeric(l=100):
-        return int(l * random.random())
-    numeric = Parameter(init_numeric, lambda x: x + int(random.random()*10), lambda x, y: (x + y)//2)
-    simplegeno = Genotype(x=numeric, y=numeric)
-    simplegeno.alter_init(x={'l':200})
-    pop1 = simplegeno.get_population(10)
-    pop2 = simplegeno.get_population(5)
-    print(pop1)
-    print("now pop 2")
-    print(pop2)
-    print("now joined")
-    print(simplegeno.join_pops(pop1, pop2))
-    print("now crossover pop 1")
-    pop3 = simplegeno.crossover(pop1, [(0,1), (1,2), (2,3)])
-    print(pop3)
-    simplegeno.mutate_all(pop3)
-    print("now mutated:")
-    print(pop3)
-
-if __name__ == '__main__' and False:
-    xss, yss = [], []
-    
-    # DEFINE FUNCTION
     A, B = 0, 100
     rosenbrock_func = lambda x: (A - x[0])**2 + B * (x[1] - x[0]**2)**2
     rastrigin_func = lambda x: 2 * 10 + ((x[0]**2 - 10 * np.cos(2 * np.pi * x[0])) + (x[1]**2 - 10 * np.cos(2 * np.pi * x[1])))
+    if rosenbrock: func = rosenbrock_func
+    else: func = rastrigin_func
 
     # PARAMETERS -  you can change these!
     x_range = (-3, 3)
-    # init_x_range = x_range
-    x_shape = (2,)
-    popsize = 100
-    num_gens = 50
-    
-    # SET FUNCTION TO OPTIMIZE
-    func = rastrigin_func
 
     # ANIMATION
     # Create Benchmark Function
@@ -104,7 +54,7 @@ if __name__ == '__main__' and False:
     ax_all_perf = fig.add_subplot(gs[1, 2])
 
     # Rosenbrock vmax=1000, Rastrigin vmax=60
-    if func == rosenbrock_func:
+    if rosenbrock:
         contour = ax_main.contourf(X, Y, func((X, Y)), 300, vmin=0, vmax=1000, cmap='jet') 
         ax_main.set_title("Benchmark function: Rosenbrock")
     else:
@@ -117,7 +67,7 @@ if __name__ == '__main__' and False:
     ax_main.set_ylabel("y values")
     scat = ax_main.scatter([x[0] for x in xss[0]], [x[1] for x in xss[0]], c='w', marker="*")
 
-    ax_global_best.set_xlim(0, num_iters)
+    ax_global_best.set_xlim(0, len(xss))
     ax_global_best.set_ylim(-0.1, min(yss[0]))
     ax_global_best.set_title("Global Best Performance")
     ax_global_best.set_xlabel("Iteration")
@@ -125,7 +75,7 @@ if __name__ == '__main__' and False:
     line_global_data = []
     line_global_best,  = ax_global_best.plot([], [], c='#00ee00', lw=2)
 
-    ax_all_perf.set_xlim(0, num_iters)
+    ax_all_perf.set_xlim(0, len(xss))
     ax_all_perf.set_ylim(-0.1, 120)
     ax_all_perf.set_title("All Particle Performance")
     ax_all_perf.set_xlabel("Iteration")
@@ -159,3 +109,32 @@ if __name__ == '__main__' and False:
     ani_global_best = animation.FuncAnimation(fig, animate_global_best, frames=len(xss), interval=interval)
     ani_all_perf = animation.FuncAnimation(fig, animate_all_perf, fargs=([all_lines]), frames=len(xss), interval=interval)
     plt.show()
+
+if __name__ == '__main__':
+    A, B = 0, 100
+    rosenbrock_fitness = Fitness(lambda pop: (A - pop['x'])**2 + B * (pop['y'] - pop['x']**2)**2, minimize=True)
+    rastrigin2_fitness = Fitness(lambda pop: 2 * 10 + ((pop['x']**2 - 10 * np.cos(2 * np.pi * pop['x'])) + (pop['y']**2 - 10 * np.cos(2 * np.pi * pop['y']))), minimize=True)
+    GA_rosenbrock = basic_n2_GA(rosenbrock_fitness, popsize=100)
+    GA_rastrigin2 = basic_n2_GA(rastrigin2_fitness, popsize=100)
+
+    # Rosenbrock
+    fitness, pops = GA_rosenbrock.iterate(50, record_population=True)
+    xss = [[[pops[i]['x'][j], pops[i]['y'][j]] for j in range(len(pops[i]['x']))] for i in range(len(pops))]
+    yss = [[pops[i]['fitness'][j] for j in range(len(pops[i]['fitness']))] for i in range(len(pops))]
+    plt.plot([sum(f)/len(f) for f in fitness], label='average fitness')
+    plt.plot([f[0] for f in fitness], label='top fitness')
+    plt.legend()
+    plt.title('Rosenbrock')
+    plt.show()
+    animation_visualizer(xss, yss)
+
+    # Rastrigin
+    fitness, pops = GA_rastrigin2.iterate(50, record_population=True)
+    xss = [[[pops[i]['x'][j], pops[i]['y'][j]] for j in range(len(pops[i]['x']))] for i in range(len(pops))]
+    yss = [[pops[i]['fitness'][j] for j in range(len(pops[i]['fitness']))] for i in range(len(pops))]
+    plt.plot([sum(f)/len(f) for f in fitness], label='average fitness')
+    plt.plot([f[0] for f in fitness], label='top fitness')
+    plt.legend()
+    plt.title('Rastrigin 2D')
+    plt.show()
+    animation_visualizer(xss, yss, False)
