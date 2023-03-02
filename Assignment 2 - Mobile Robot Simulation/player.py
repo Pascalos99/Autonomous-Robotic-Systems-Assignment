@@ -225,9 +225,8 @@ class Player:
 
         return None
 
-    @staticmethod
-    def get_intersection_circle_line(line: Union[list, np.ndarray], position: Union[list, np.ndarray], radius: float) -> Union[np.ndarray, None]:
-        # Calculate the distance between the center of the circle and the line
+    def get_intersection_circle_line(self, line: Union[list, np.ndarray], position: Union[list, np.ndarray], radius: float) -> Union[np.ndarray, None]:
+        # Calculate the distance between the center of the circle and the line.
         x_diff = line[1][0] - line[0][0]
         y_diff = line[1][1] - line[0][1]
         num = abs(y_diff * position[0] - x_diff * position[1] + line[1][0] * line[0][1] - line[1][1] * line[0][0])
@@ -248,32 +247,39 @@ class Player:
             # Distance between the closest point and the center of the circle is greater than the radius of the circle.
             return None
 
-        # Calculate the distance between the intersection points and the closest point
+        # Calculate the distance between the intersection points and the closest point.
         dist_to_intersection = np.sqrt(radius ** 2 - dist_to_closest_point ** 2)
 
-        # Calculate the intersection points
+        # Calculate the intersection points.
         if y_diff == 0:
-            # Horizontal line
+            # Horizontal line.
             intersection_1 = np.array([closest_point[0] + dist_to_intersection, closest_point[1]])
             intersection_2 = np.array([closest_point[0] - dist_to_intersection, closest_point[1]])
         elif x_diff == 0:
-            # Vertical line
+            # Vertical line.
             intersection_1 = np.array([closest_point[0], closest_point[1] + dist_to_intersection])
             intersection_2 = np.array([closest_point[0], closest_point[1] - dist_to_intersection])
         else:
-            # Diagonal line
+            # Diagonal line.
             m = y_diff / x_diff
             b = line[0][1] - m * line[0][0]
             x_1 = closest_point[0] + (dist_to_intersection / np.sqrt(1 + m ** 2))
             x_2 = closest_point[0] - (dist_to_intersection / np.sqrt(1 + m ** 2))
             intersection_1 = np.array([x_1, m * x_1 + b])
             intersection_2 = np.array([x_2, m * x_2 + b])
+            
+        # Check if the intersection points lie on the line segment.
+        intersections = []
+        if self.point_on_line_segment(line, intersection_1):
+            intersections.append(intersection_1)
+        if self.point_on_line_segment(line, intersection_2) and not np.array_equal(intersection_1, intersection_2):
+            intersections.append(intersection_2)
 
-        # Return the intersection points
-        if np.array_equal(intersection_1, intersection_2):
-            return [intersection_1]
-        else:
-            return [intersection_1, intersection_2]
+        # Return the intersection points.
+        if len(intersections) == 0:
+            return None
+        
+        return intersections
 
     @staticmethod
     def point_on_line_segment(line, point):
