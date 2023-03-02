@@ -20,6 +20,7 @@ class Genotype:
         self.__init_kwargs = {par: {} for par in self.params}
         self.__mutate_kwargs = {par: {} for par in self.params}
         self.__crossover_kwargs = {par: {} for par in self.params}
+        self.__fit_params = {par: [fit for fit in ['fitness1', 'fitness2'] if fit in fargs(self.__dict__[par].crossover).args] for par in self.params}
 
     def get_param(self, param_name) -> Parameter:
         if not param_name in self.params:
@@ -53,9 +54,9 @@ class Genotype:
         # the returned dictionary is in order of the given pairs and contains their unmutated offspring
         # FM is an internal parameter: "fitness multiplier" which is +1 for maximizing fitness, and -1 otherwise
         ex1 = lambda p1, p2: {'fitness1': FM * population['fitness'][p1], 'fitness2': FM * population['fitness'][p2]}
-        extr = lambda f, p1, p2: {par: ex1(p1,p2)[par] for par in ['fitness1', 'fitness2'] if par in fargs(f).args}
+        extr = lambda par, p1, p2: {fit: ex1(p1,p2)[fit] for fit in self.__fit_params[par]}
         return {param: [self.__dict__[param].crossover(population[param][p1], population[param][p2],
-            **extr(self.__dict__[param].crossover, p1, p2), **self.__crossover_kwargs[param]) for p1, p2 in pairs] for param in self.params}
+            **extr(param, p1, p2), **self.__crossover_kwargs[param]) for p1, p2 in pairs] for param in self.params}
     
     def join_pops(self, *pops) -> dict:
         all_params = self.params
