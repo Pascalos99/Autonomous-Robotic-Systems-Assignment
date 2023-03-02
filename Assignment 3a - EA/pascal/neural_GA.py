@@ -94,7 +94,7 @@ if __name__ == '__main__':
     }
 
     GA = get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers, activation_functions, popsize, **params)
-    fits = GA.iterate(400)
+    fits = GA.iterate(400, parallel=True)
     best: ANN = GA.population['ann'][0]
     print("best fitness:", fits[-1][0])
     print("best model output: (should be the identity matrix)")

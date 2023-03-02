@@ -1,5 +1,30 @@
 import random
-from inspect import getfullargspec as fargs
+import inspect
+import multiprocessing as mp
+
+import time
+
+def my_function(i, key):
+        print("starting %s [%d]"%(key, i))
+        time.sleep(2)
+        print("finished %s [%d]"%(key, i))
+        return (key, int(round(random.random() * 100)))
+
+if __name__ == '__main__':
+    results = {'a': 1, 'b': None, 'c': None, 'd':7, 'e': None, 'f': 1, 'g': None}
+    params = list(results.keys())
+    def store_result(result):
+        key, val = result
+        results[key] = val
+    pool = mp.Pool(mp.cpu_count())
+    ts = time.time()
+    for i in range(len(params)):
+        if results[params[i]] is None:
+            pool.apply_async(my_function, args=(i, params[i]), callback=store_result)
+    pool.close()
+    pool.join()
+    print('computation took:', time.time() - ts)
+    print(results)
 
 class Parameter:
     def __init__(self, init: callable, mutate: callable, crossover: callable):
@@ -20,7 +45,7 @@ class Genotype:
         self.__init_kwargs = {par: {} for par in self.params}
         self.__mutate_kwargs = {par: {} for par in self.params}
         self.__crossover_kwargs = {par: {} for par in self.params}
-        self.__fit_params = {par: [fit for fit in ['fitness1', 'fitness2'] if fit in fargs(self.__dict__[par].crossover).args] for par in self.params}
+        self.__fit_params = {par: [fit for fit in ['fitness1', 'fitness2'] if fit in inspect.getfullargspec(self.__dict__[par].crossover).args] for par in self.params}
 
     def get_param(self, param_name) -> Parameter:
         if not param_name in self.params:
@@ -78,7 +103,7 @@ class Genotype:
 class Fitness:
     def __init__(self, compute: callable, minimize=False):
         # compute({individual}) -> double
-        self.__compute = compute
+        self.__compute_fitness = compute
         self.minimize = minimize
 
     def individual(self, individual: dict, recompute=False):
@@ -88,17 +113,43 @@ class Fitness:
         individual['fitness'] = self.__compute(individual)
         return individual['fitness']
     
-    def compute(self, population: dict, recompute_all=False) -> None:
+    def __compute_parallel(self, i, individual):
+        print("computing in parallel!")
+        return (i, self.__compute_fitness(individual))
+    
+    def __store_parallel(self, result):
+        i, fitness = result
+        print("results:", i, fitness)
+        self.__temp_fitness[i] = fitness
+
+    def __compute(self, i, individual, parallel_pool: mp.Pool=None):
+        if parallel_pool is None:
+            return self.__compute_fitness(individual)
+        parallel_pool.apply_async(self.__compute_parallel, args=(i, individual), callback=self.__store_parallel)
+        # self.__temp_fitness[i] = parallel_pool.apply(self.__compute_parallel, args=(i, individual))
+
+    def compute(self, population: dict, recompute_all=False, parallel=False) -> None:
+        pool = None
+        if parallel: pool = mp.Pool(mp.cpu_count())
+
         if (not 'fitness' in population.keys()) or recompute_all:
             population['fitness'] = [None for i in range(len(population[list(population.keys())[0]]))]
-        population['fitness'] = [population['fitness'][i] if population['fitness'][i] is not None else self.__compute({param: population[param][i] for param in population.keys()}) for i in range(len(population['fitness']))]
+        self.__temp_fitness = [population['fitness'][i] if population['fitness'][i] is not None else self.__compute(i, {param: population[param][i] for param in population.keys()}, pool) for i in range(len(population['fitness']))]
+        
+        if parallel:
+            pool.close()
+            pool.join()
+        for x in range(len(self.__temp_fitness)):
+            if self.__temp_fitness[x] is None:
+                raise Warning("This should not be happening")
+        population['fitness'] = self.__temp_fitness
 
-    def population(self, population: dict, recompute=False):
-        self.compute(population, recompute)
+    def population(self, population: dict, recompute=False, parallel=False):
+        self.compute(population, recompute, parallel)
         return population['fitness']
     
-    def sort_population(self, population: dict, recompute=False) -> None:
-        self.compute(population, recompute)
+    def sort_population(self, population: dict, recompute=False, parallel=False) -> None:
+        self.compute(population, recompute, parallel)
         sorted_index = sorted(range(len(population['fitness'])), key=lambda i: population['fitness'][i])
         for par in population.keys():
             population[par] = [population[par][i] for i in sorted_index]
@@ -142,13 +193,13 @@ class GeneticAlgorithm:
         # kwargs are fed directly into the pairing method defined at initialization
         self.pairingpars = pairing_kwargs
     
-    def iterate(self, num_iters, record_fitness=True, record_population=False):
+    def iterate(self, num_iters, record_fitness=True, record_population=False, parallel=False):
         fitness_record = []
         populat_record = []
 
         for i in range(num_iters):
             # determine population fitness:
-            self.fitness.sort_population(self.population, i==0)
+            self.fitness.sort_population(self.population, recompute=i==0, parallel=parallel)
             if record_fitness: fitness_record.append(list(self.population['fitness']))
             if record_population: populat_record.append(dict(self.population))
             # create offspring:
@@ -168,7 +219,7 @@ class GeneticAlgorithm:
             else: self.population = offspring
             self.iter += 1
 
-        self.fitness.sort_population(self.population, False)
+        self.fitness.sort_population(self.population, parallel=parallel)
         if record_fitness: fitness_record.append(self.population['fitness'])
         if record_population: populat_record.append(self.population)
         if record_fitness and not record_population: return fitness_record
