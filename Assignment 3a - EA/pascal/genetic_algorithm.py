@@ -1,10 +1,14 @@
 import random
+from inspect import getfullargspec as fargs
 
 class Parameter:
     def __init__(self, init: callable, mutate: callable, crossover: callable):
         self.init = init # init() -> some_type
         self.mutate = mutate # mutate(value: some_type) -> some_type
         self.crossover = crossover # crossover(value1: some_type, value2: some_type) -> some_type
+        # crossover has two optional parameters "fitness1: float" and "fitness2: float", which (if present)
+        #  represent the fitness of either parent when generating their child
+        #  [!] the parent's fitness * -1 is given instead if fitness is to be minimized
 
 class Genotype:
     def __init__(self, **parameters):
@@ -44,10 +48,14 @@ class Genotype:
             for i in indices:
                 population[param][i] = self.__dict__[param].mutate(population[param][i], **self.__mutate_kwargs[param])
     
-    def crossover(self, population: dict, pairs: list) -> dict:
+    def crossover(self, population: dict, pairs: list, FM=1) -> dict:
         # pairs is a list of 2-tuples of indices of individuals to be crossed over
         # the returned dictionary is in order of the given pairs and contains their unmutated offspring
-        return {param: [self.__dict__[param].crossover(population[param][p1], population[param][p2], **self.__crossover_kwargs[param]) for p1, p2 in pairs] for param in self.params}
+        # FM is an internal parameter: "fitness multiplier" which is +1 for maximizing fitness, and -1 otherwise
+        ex1 = lambda p1, p2: {'fitness1': FM * population['fitness'][p1], 'fitness2': FM * population['fitness'][p2]}
+        extr = lambda f, p1, p2: {par: ex1(p1,p2)[par] for par in ['fitness1', 'fitness2'] if par in fargs(f).args}
+        return {param: [self.__dict__[param].crossover(population[param][p1], population[param][p2],
+            **extr(self.__dict__[param].crossover, p1, p2), **self.__crossover_kwargs[param]) for p1, p2 in pairs] for param in self.params}
     
     def join_pops(self, *pops) -> dict:
         all_params = self.params
@@ -146,7 +154,8 @@ class GeneticAlgorithm:
             survivepop = self.selection(self.population, **self.selectionpars)
             numoffspring = self.popsize
             if self.keep_pops: numoffspring -= len(survivepop[list(survivepop.keys())[0]])
-            offspring = self.genotype.crossover(survivepop, self.pairing(survivepop, numoffspring, **self.pairingpars))
+            FM = 1. - 2. * int(self.fitness.minimize)
+            offspring = self.genotype.crossover(survivepop, self.pairing(survivepop, numoffspring, **self.pairingpars), FM=FM)
             # mutate offspring:
             mutate_indices = None
             if self.mut_rate < 1.:
