@@ -54,10 +54,12 @@ class Simulation:
         self.win = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
         self.map = Map()
-        self.map.load_map_from_json(f'{working_directory}/maps/rect_map.json')
+        self.map.load_map_from_json(f"{working_directory}/maps/{str(config['PROGRAM']['map_file'])}")
         self.player = Player(self.map)
 
         self.sensitivity = float(config['PROGRAM']['speed_step'])
+
+        # In the README.md is explained how the bot is controlled with a keyboard.
         self.key_config = {
             pygame.K_q: lambda: self.player.change_vel(0, self.sensitivity),
             pygame.K_a: lambda: self.player.change_vel(0, -self.sensitivity),

@@ -186,22 +186,22 @@ class Player:
 
     def calculate_sensor(self):
         for sensor_number, sensor in self.sensor_lines.items():
-            no_intersect_counter = 0
             sensor_line = sensor[0]
+            intersect_points = []
 
-            # Check if line intersects with any wall.
             for wall in self.map.lines:
                 intersect_coordinates = self.get_intersection_lines(sensor_line, wall)
                 if intersect_coordinates is not None:
-                    # Calculate distance with Pythagorean theorem.
-                    sensor_distance = ((intersect_coordinates[0] - sensor_line[0][0]) ** 2 +
-                                       (intersect_coordinates[1] - sensor_line[0][1]) ** 2) ** 0.5
-                    self.sensor_lines[sensor_number][1] = sensor_distance
-                else:
-                    no_intersect_counter += 1
-                    if no_intersect_counter == len(self.map.lines):
-                        # Sensor line did not intersect with any objects, so reset distance number to the vision range.
-                        self.sensor_lines[sensor_number][1] = self.vision_range
+                    intersect_points.append(intersect_coordinates)
+
+            if intersect_points:
+                intersect_points = np.array(intersect_points)
+                # Calculate all distances in numpy array with the Pythagorean theorem.
+                distance_array = np.sqrt(np.sum((intersect_points - sensor_line[0])**2, axis=1))
+                self.sensor_lines[sensor_number][1] = np.amin(distance_array)
+            else:
+                # Sensor line did not intersect with any objects, so reset distance number to the vision range.
+                self.sensor_lines[sensor_number][1] = self.vision_range
 
     @staticmethod
     def get_intersection_lines(line_1: Union[list, np.ndarray], line_2: Union[list, np.ndarray]) -> Union[np.ndarray, None]:
