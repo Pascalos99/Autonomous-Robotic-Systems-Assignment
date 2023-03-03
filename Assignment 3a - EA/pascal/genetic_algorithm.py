@@ -1,30 +1,8 @@
 import random
 import inspect
-import multiprocessing as mp
+from concurrent.futures import ThreadPoolExecutor
 
 import time
-
-def my_function(i, key):
-        print("starting %s [%d]"%(key, i))
-        time.sleep(2)
-        print("finished %s [%d]"%(key, i))
-        return (key, int(round(random.random() * 100)))
-
-if __name__ == '__main__':
-    results = {'a': 1, 'b': None, 'c': None, 'd':7, 'e': None, 'f': 1, 'g': None}
-    params = list(results.keys())
-    def store_result(result):
-        key, val = result
-        results[key] = val
-    pool = mp.Pool(mp.cpu_count())
-    ts = time.time()
-    for i in range(len(params)):
-        if results[params[i]] is None:
-            pool.apply_async(my_function, args=(i, params[i]), callback=store_result)
-    pool.close()
-    pool.join()
-    print('computation took:', time.time() - ts)
-    print(results)
 
 class Parameter:
     def __init__(self, init: callable, mutate: callable, crossover: callable):
@@ -113,35 +91,35 @@ class Fitness:
         individual['fitness'] = self.__compute(individual)
         return individual['fitness']
     
-    def __compute_parallel(self, i, individual):
-        print("computing in parallel!")
+    def __compute_parallel(self, i_individual):
+        i, individual = i_individual
         return (i, self.__compute_fitness(individual))
-    
-    def __store_parallel(self, result):
-        i, fitness = result
-        print("results:", i, fitness)
-        self.__temp_fitness[i] = fitness
 
-    def __compute(self, i, individual, parallel_pool: mp.Pool=None):
-        if parallel_pool is None:
+    def __compute(self, i, individual):
+        if self.pool is None:
             return self.__compute_fitness(individual)
-        parallel_pool.apply_async(self.__compute_parallel, args=(i, individual), callback=self.__store_parallel)
-        # self.__temp_fitness[i] = parallel_pool.apply(self.__compute_parallel, args=(i, individual))
+        self.tasks.append((i, individual))
 
     def compute(self, population: dict, recompute_all=False, parallel=False) -> None:
-        pool = None
-        if parallel: pool = mp.Pool(mp.cpu_count())
+        self.pool = None
+        if parallel:
+            self.pool = ThreadPoolExecutor()
+            # self.futures = []
+            self.tasks = []
 
         if (not 'fitness' in population.keys()) or recompute_all:
             population['fitness'] = [None for i in range(len(population[list(population.keys())[0]]))]
-        self.__temp_fitness = [population['fitness'][i] if population['fitness'][i] is not None else self.__compute(i, {param: population[param][i] for param in population.keys()}, pool) for i in range(len(population['fitness']))]
+        self.__temp_fitness = [population['fitness'][i] if population['fitness'][i] is not None else self.__compute(i, {param: population[param][i] for param in population.keys()}) for i in range(len(population['fitness']))]
         
         if parallel:
-            pool.close()
-            pool.join()
+            results = self.pool.map(self.__compute_parallel, self.tasks)
+            self.pool.shutdown()
+            for res in results:
+                i, fit = res
+                self.__temp_fitness[i] = fit
         for x in range(len(self.__temp_fitness)):
             if self.__temp_fitness[x] is None:
-                raise Warning("This should not be happening")
+                raise Warning("Something went wrong with parallel computation, please try sequential instead!")
         population['fitness'] = self.__temp_fitness
 
     def population(self, population: dict, recompute=False, parallel=False):

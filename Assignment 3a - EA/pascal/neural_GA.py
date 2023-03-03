@@ -79,6 +79,10 @@ if __name__ == '__main__':
     num_inputs, num_outputs, hidden_layers = dat_len, dat_len, [comp_len]
     activation_functions = sigmoid
     popsize = 50
+    num_gens = 400
+    parallel = False
+    # overhead for parallel computation is significant (several seconds at least),
+    #  but it's worth it if the fitness function takes more than 
     fit_ratio_importance = 1/3.
     params = {
         "init_mu": 0,
@@ -94,7 +98,7 @@ if __name__ == '__main__':
     }
 
     GA = get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers, activation_functions, popsize, **params)
-    fits = GA.iterate(400, parallel=True)
+    fits = GA.iterate(num_gens, parallel=parallel)
     best: ANN = GA.population['ann'][0]
     print("best fitness:", fits[-1][0])
     print("best model output: (should be the identity matrix)")
