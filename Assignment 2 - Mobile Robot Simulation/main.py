@@ -2,6 +2,7 @@ import configparser
 import datetime
 import json
 import pathlib
+import timeit
 
 import numpy as np
 import pygame
@@ -135,6 +136,7 @@ class Simulation:
             ], width=1)
 
         # Calculate if one or more sensor line(s) intersect with an object, if so calculate the distance
+        # print(timeit.timeit(self.player.calculate_sensor, number=100))
         self.player.calculate_sensor()
 
         # Show motor numbers

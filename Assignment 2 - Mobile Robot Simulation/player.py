@@ -207,20 +207,21 @@ class Player:
     def get_intersection_lines(line_1: Union[list, np.ndarray], line_2: Union[list, np.ndarray]) -> Union[np.ndarray, None]:
         # Calculate intersection point between two lines using:
         # https://en.m.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment.
-        x1, y1, x2, y2 = line_1[0][0], line_1[0][1], line_1[1][0], line_1[1][1]
-        x3, y3, x4, y4 = line_2[0][0], line_2[0][1], line_2[1][0], line_2[1][1]
+        x1, y1 = line_1[0]
+        x2, y2 = line_1[1]
+        x3, y3 = line_2[0]
+        x4, y4 = line_2[1]
 
-        t = np.divide(
-            (x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4),
-            (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-        )
-        u = np.divide(
-            (x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2),
-            (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-        )
+        denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+        if denominator == 0:
+            return None
+
+        t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator
+        u = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / denominator
 
         if 0 <= t <= 1 and 0 <= u <= 1:
-            x_intercept, y_intercept = (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+            x_intercept = x1 + t * (x2 - x1)
+            y_intercept = y1 + t * (y2 - y1)
             return np.array([x_intercept, y_intercept])
 
         return None
