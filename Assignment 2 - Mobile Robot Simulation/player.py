@@ -47,7 +47,7 @@ class Player:
             if self.position_intersects_wall(new_position):
                 # Save the intended new position.
                 intended_new_position = new_position
-                
+
                 # If so, move the player to the closest point on the wall.
                 # Number of steps to check between current and new position to find the closest point on the wall.
                 num_steps = 100
@@ -76,26 +76,26 @@ class Player:
                         # Only needs to be done if the robot is colliding with more than one wall.
                         if len(circle_intersections) > 1:
                             correct_intersections = []
-                            
+
                             x1, y1 = current_position[0], current_position[1]
                             x2, y2 = intended_new_position[0], intended_new_position[1]
                             for intersection in circle_intersections:
                                 # Check if the wall intersects with the original movement direction of the robot.
                                 wall = intersection[0]
-                                
+
                                 x3, y3 = wall[0][0], wall[0][1]
                                 x4, y4 = wall[1][0], wall[1][1]
-                                
+
                                 denominator = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
                                 if denominator != 0:
                                     u = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denominator
                                     if u > 0:
                                         # Wall intersects with the original movement direction of the robot so add it to the correct intersections.
                                         correct_intersections.append(intersection)
-                            
+
                             # Replace the circle intersections with the correct ones.
                             circle_intersections = correct_intersections
-                        
+
                         new_position = current_position
                         for intersection in circle_intersections:
                             # Get the wall that collides with the robot and the collision point.
@@ -163,12 +163,10 @@ class Player:
 
     def position_intersects_wall(self, position: np.ndarray):
         # Check if the robot intersects with any of the walls using lines.
-        player_lines = {
-            "left": np.array([self.pos - [self.radius, 0], position - [self.radius, 0]]),
-            "right": np.array([self.pos + [self.radius, 0], position + [self.radius, 0]]),
-            "upper": np.array([self.pos + [0, self.radius], position + [0, self.radius]]),
-            "bottom": np.array([self.pos - [0, self.radius], position - [0, self.radius]])
-        }
+        player_lines = {"left": np.array([self.pos - [self.radius, 0], position - [self.radius, 0]]),
+                        "right": np.array([self.pos + [self.radius, 0], position + [self.radius, 0]]),
+                        "upper": np.array([self.pos + [0, self.radius], position + [0, self.radius]]),
+                        "bottom": np.array([self.pos - [0, self.radius], position - [0, self.radius]])}
 
         for line in self.map.lines:
             for player_line in player_lines.values():
@@ -184,7 +182,10 @@ class Player:
 
         return False
 
-    def calculate_sensor(self):
+    def calculate_sensor_distance(self):
+        # First calculate the coordinates of the sensor lines
+        self.calculate_sensor_lines()
+
         for sensor_number, sensor in self.sensor_lines.items():
             sensor_line = sensor[0]
             intersect_points = []
@@ -197,11 +198,21 @@ class Player:
             if intersect_points:
                 intersect_points = np.array(intersect_points)
                 # Calculate all distances in numpy array with the Pythagorean theorem.
-                distance_array = np.sqrt(np.sum((intersect_points - sensor_line[0])**2, axis=1))
+                distance_array = np.sqrt(np.sum((intersect_points - sensor_line[0]) ** 2, axis=1))
                 self.sensor_lines[sensor_number][1] = np.amin(distance_array)
             else:
                 # Sensor line did not intersect with any objects, so reset distance number to the vision range.
                 self.sensor_lines[sensor_number][1] = self.vision_range
+
+    def calculate_sensor_lines(self):
+        angle = 2 * np.pi / self.num_sensors
+        for i in range(self.num_sensors):
+            start_x = self.pos[0] + self.radius * np.cos(i * angle - self.direction)
+            start_y = self.pos[1] - self.radius * np.sin(i * angle - self.direction)
+            end_x = self.pos[0] + (self.vision_range + self.radius) * np.cos(i * angle - self.direction)
+            end_y = self.pos[1] - (self.vision_range + self.radius) * np.sin(i * angle - self.direction)
+
+            self.sensor_lines[i][0] = np.array([[start_x, start_y], [end_x, end_y]], dtype=np.float64)
 
     @staticmethod
     def get_intersection_lines(line_1: Union[list, np.ndarray], line_2: Union[list, np.ndarray]) -> Union[np.ndarray, None]:
@@ -213,12 +224,14 @@ class Player:
         x4, y4 = line_2[1]
 
         denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-        if denominator == 0:
+        # If the first line and second line are parallel return None, since there is no intersection.
+        if not denominator:
             return None
 
         t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denominator
         u = ((x1 - x3) * (y1 - y2) - (y1 - y3) * (x1 - x2)) / denominator
 
+        # Check if the two lines intersect
         if 0 <= t <= 1 and 0 <= u <= 1:
             x_intercept = x1 + t * (x2 - x1)
             y_intercept = y1 + t * (y2 - y1)
@@ -268,7 +281,7 @@ class Player:
             x_2 = closest_point[0] - (dist_to_intersection / np.sqrt(1 + m ** 2))
             intersection_1 = np.array([x_1, m * x_1 + b])
             intersection_2 = np.array([x_2, m * x_2 + b])
-            
+
         # Check if the intersection points lie on the line segment.
         intersections = []
         if self.point_on_line_segment(line, intersection_1):
@@ -279,7 +292,7 @@ class Player:
         # Return the intersection points.
         if len(intersections) == 0:
             return None
-        
+
         return intersections
 
     @staticmethod

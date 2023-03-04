@@ -2,7 +2,6 @@ import configparser
 import datetime
 import json
 import pathlib
-import timeit
 
 import numpy as np
 import pygame
@@ -61,15 +60,13 @@ class Simulation:
         self.sensitivity = float(config['PROGRAM']['speed_step'])
 
         # In the README.md is explained how the bot is controlled with a keyboard.
-        self.key_config = {
-            pygame.K_q: lambda: self.player.change_vel(0, self.sensitivity),
-            pygame.K_a: lambda: self.player.change_vel(0, -self.sensitivity),
-            pygame.K_w: lambda: self.player.change_vel(self.sensitivity, self.sensitivity),
-            pygame.K_s: lambda: self.player.change_vel(-self.sensitivity, -self.sensitivity),
-            pygame.K_e: lambda: self.player.change_vel(self.sensitivity, 0),
-            pygame.K_d: lambda: self.player.change_vel(-self.sensitivity, 0),
-            pygame.K_x: lambda: self.player.reset_vel(),
-        }
+        self.key_config = {pygame.K_q: lambda: self.player.change_vel(0, self.sensitivity),
+                           pygame.K_a: lambda: self.player.change_vel(0, -self.sensitivity),
+                           pygame.K_w: lambda: self.player.change_vel(self.sensitivity, self.sensitivity),
+                           pygame.K_s: lambda: self.player.change_vel(-self.sensitivity, -self.sensitivity),
+                           pygame.K_e: lambda: self.player.change_vel(self.sensitivity, 0),
+                           pygame.K_d: lambda: self.player.change_vel(-self.sensitivity, 0),
+                           pygame.K_x: lambda: self.player.reset_vel(), }
 
     def run(self):
         is_running = True
@@ -83,10 +80,12 @@ class Simulation:
                         self.key_config[event.key]()
                     except KeyError:
                         pass
+
                 if event.type == pygame.VIDEORESIZE:
                     self.win = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
 
             self.player.step()
+            self.player.calculate_sensor_distance()
             self.draw()
             self.clock.tick(FPS)
 
@@ -112,32 +111,14 @@ class Simulation:
         # Draw Direction Line
         pygame.draw.line(self.win, '#000000', self.player.pos, (
             self.player.pos[0] + self.player.radius * np.sin(self.player.direction + 0.5 * np.pi),
-            self.player.pos[1] - self.player.radius * np.cos(self.player.direction + 0.5 * np.pi),
-        ), width=2)
+            self.player.pos[1] - self.player.radius * np.cos(self.player.direction + 0.5 * np.pi),), width=2)
 
         # Draw all sensor lines
         angle = 2 * np.pi / self.player.num_sensors
         for i in range(self.player.num_sensors):
-            start_x = self.player.pos[0] + self.player.radius * np.cos(i * angle - self.player.direction)
-            start_y = self.player.pos[1] - self.player.radius * np.sin(i * angle - self.player.direction)
-            end_x = self.player.pos[0] + (self.player.vision_range + self.player.radius) * np.cos(
-                i * angle - self.player.direction)
-            end_y = self.player.pos[1] - (self.player.vision_range + self.player.radius) * np.sin(
-                i * angle - self.player.direction)
-
-            self.player.sensor_lines[i][0] = np.array([[start_x, start_y], [end_x, end_y]], dtype=np.float64)
-
-            pygame.draw.line(self.win, '#dd0000', start_pos=[
-                start_x,
-                start_y,
-            ], end_pos=[
-                end_x,
-                end_y,
-            ], width=1)
-
-        # Calculate if one or more sensor line(s) intersect with an object, if so calculate the distance
-        # print(timeit.timeit(self.player.calculate_sensor, number=100))
-        self.player.calculate_sensor()
+            start_x, start_y = self.player.sensor_lines[i][0][0]
+            end_x, end_y = self.player.sensor_lines[i][0][1]
+            pygame.draw.line(self.win, '#dd0000', start_pos=[start_x, start_y, ], end_pos=[end_x, end_y, ], width=1)
 
         # Show motor numbers
         x_text = FONT.render(f'l:{int(self.player.vel[1] / self.sensitivity)}', False, '#dddddd')
@@ -156,10 +137,12 @@ class Simulation:
         # Show Distance Numbers
         for i in range(self.player.num_sensors):
             distance = self.player.sensor_lines[i][1]
+
             if not bool(int(config['PROGRAM']['sensor_data_separate'])):
                 text = FONT.render(str(int(round(distance, 0))), False, '#dddddd')
             else:
                 text = FONT.render(str(i), False, '#dddddd')
+
             self.win.blit(text, dest=[
                 (self.player.pos[0] - text.get_width() // 2 + (self.player.radius + 20)
                  * np.cos(i * angle - self.player.direction)),
@@ -171,9 +154,7 @@ class Simulation:
             for i in range(self.player.num_sensors):
                 distance = self.player.sensor_lines[i][1]
                 text = FONT.render(f"Sensor {i}: {int(round(distance, 0))}", False, '#dddddd')
-                self.win.blit(text, dest=[
-                    self.win.get_width() - 150, 50 + i * 15
-                ])
+                self.win.blit(text, dest=[self.win.get_width() - 150, 50 + i * 15])
 
     def clear(self):
         self.win.fill('#232323')
