@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import matplotlib.gridspec as gridspec
 from genetic_algorithm import *
+import json
 
 # simple n=2
 def init_numeric(min=-3, max=3):
@@ -131,7 +132,7 @@ if __name__ == '__main__':
     # plt.legend()
     # plt.title('Rosenbrock')
     # plt.show()
-    animation_visualizer(xss, yss, fitness)
+    # animation_visualizer(xss, yss, fitness)
 
     # Rastrigin
     fitness, pops = GA_rastrigin2.iterate(50, record_population=True)
@@ -142,4 +143,4 @@ if __name__ == '__main__':
     # plt.legend()
     # plt.title('Rastrigin 2D')
     # plt.show()
-    animation_visualizer(xss, yss, fitness, False)
+    # animation_visualizer(xss, yss, fitness, False)
