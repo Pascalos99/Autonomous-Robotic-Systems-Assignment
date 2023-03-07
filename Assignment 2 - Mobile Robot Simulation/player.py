@@ -25,6 +25,9 @@ class Player:
     def change_vel(self, left: float, right: float):
         self.vel[0] += left
         self.vel[1] += right
+        
+    def set_vel(self, left: float, right: float):
+        self.vel = [left, right]
 
     def reset_vel(self):
         self.vel = [0, 0]
