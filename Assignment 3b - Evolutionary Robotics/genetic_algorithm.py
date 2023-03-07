@@ -104,20 +104,22 @@ class Fitness:
             population[par] = [population[par][i] for i in sorted_index]
 
 class GeneticAlgorithm:
-    def __init__(self, fitness: Fitness, genotype: Genotype, pairing: callable, selection: callable, population_size: int):
-        # selection(population: dict) -> survivors: dict
+    def __init__(self, fitness: Fitness, genotype: Genotype, pairing: callable, selection: callable, survival: callable, population_size: int):
+        # selection(population: dict) -> allowed_to_reproduce: dict
+        # survival(allowed_to_reproduce: dict) -> survivors: dict
         # pairing(population: dict, size: int) -> [(p1_index, p2_index), ...]: list(tuple) w/ len = size
         self.fitness = fitness
         self.genotype = genotype
         self.pairing = pairing
         self.selection = selection
+        self.survival = survival
         self.popsize = population_size
         self.pairingpars = {}
         self.selectionpars = {}
+        self.survivorpars = {}
         self.population = None
         self.iter = 0
         self.mut_rate = 1.
-        self.keep_pops = True
 
     def initialize(self, **init_kwargs):
         # kwargs need to be named as the parameter they affect, with the value being the kwargs dictionary of the method it modifies
@@ -138,6 +140,10 @@ class GeneticAlgorithm:
         # kwargs are fed directly into the selection method defined at initialization
         self.selectionpars = selection_kwargs
     
+    def alter_survival(self, **survival_kwargs):
+        # kwargs are fed directly into the survival method defined at initialization
+        self.survivorpars = survival_kwargs
+    
     def alter_pairing(self, **pairing_kwargs):
         # kwargs are fed directly into the pairing method defined at initialization
         self.pairingpars = pairing_kwargs
@@ -152,20 +158,18 @@ class GeneticAlgorithm:
             if record_fitness: fitness_record.append(list(self.population['fitness']))
             if record_population: populat_record.append(dict(self.population))
             # create offspring:
-            survivepop = self.selection(self.population, **self.selectionpars)
-            numoffspring = self.popsize
-            if self.keep_pops: numoffspring -= len(survivepop[list(survivepop.keys())[0]])
+            breedpop = self.selection(self.population, **self.selectionpars)
+            survivepop = self.survival(breedpop, **self.survivorpars)
+            numoffspring = self.popsize - len(survivepop[list(survivepop.keys())[0]])
             FM = 1. - 2. * int(self.fitness.minimize)
-            offspring = self.genotype.crossover(survivepop, self.pairing(survivepop, numoffspring, **self.pairingpars), FM=FM)
+            offspring = self.genotype.crossover(breedpop, self.pairing(breedpop, numoffspring, **self.pairingpars), FM=FM)
             # mutate offspring:
             mutate_indices = None
             if self.mut_rate < 1.:
                 mutate_indices = random.sample(range(numoffspring), int(round(self.mut_rate * numoffspring)))
             self.genotype.mutate_all(offspring, mutate_indices)
             # set new population:
-            if self.keep_pops:
-                self.population = self.genotype.join_pops(survivepop, offspring)
-            else: self.population = offspring
+            self.population = self.genotype.join_pops(survivepop, offspring)
             self.iter += 1
 
         self.fitness.sort_population(self.population, False)
@@ -175,13 +179,28 @@ class GeneticAlgorithm:
         if not record_fitness and record_population: return populat_record
         if record_fitness and record_population: return fitness_record, populat_record
 
+# ------------- #
+#   SELECTION   #
+# ------------- #
+
 def elitist_selection(population, elitist_percent=0.3, lucky_chance=0.1):
     popsize = len(population[list(population.keys())[0]])
     elitists = int(round(elitist_percent * popsize))
     pop_elitist = {par: population[par][:elitists] for par in population.keys()}
     index_lucky = random.sample(range(elitists, popsize), int(round(lucky_chance * (popsize - elitists))))
     return {par: pop_elitist[par] + [population[par][i] for i in index_lucky] for par in population.keys()}
+
+# ------------- #
+#    SURVIVAL   #
+# ------------- #
+
+def binary_survival(population, keep_old_pops=False):
+    if keep_old_pops: return population
+    return {par: [] for par in population.keys()}
     
+# ------------- #
+#    PAIRING    #
+# ------------- #
 def random_asex(population, size):
     popsize = len(population[list(population.keys())[0]])
     return [(c, c) for c in [random.choice(range(popsize)) for _ in range(size)]]
