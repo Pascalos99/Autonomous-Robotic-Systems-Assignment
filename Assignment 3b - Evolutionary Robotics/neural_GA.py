@@ -54,10 +54,11 @@ def get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers=[], activation_fu
                avoid_asex=True, keep_old_population=True, elitist_percent=0.4, lucky_chance=0.2, master_mut_chance=1.,
                weight_mut_chance=1., mut_sigma=0.1, crossover_fit_weighting=lambda p1, p2: 0.5):
     anngeno = ga.Genotype(ann=FixedTopologyANN(num_inputs, num_outputs, hidden_layers, activation_functions))
-    GA = ga.GeneticAlgorithm(fitness, anngeno, ga.random_pairing, ga.elitist_selection, population_size=popsize)
+    GA = ga.GeneticAlgorithm(fitness, anngeno, ga.random_pairing, ga.elitist_selection, ga.binary_survival, population_size=popsize)
     GA.initialize(ann={'mu':init_mu, 'sigma':init_sigma})
     GA.alter_pairing(avoid_asex=avoid_asex)
-    GA.alter_crossover(keep_old_population=keep_old_population, fitness_weighting=crossover_fit_weighting)
+    GA.alter_crossover(fitness_weighting=crossover_fit_weighting)
     GA.alter_selection(elitist_percent=elitist_percent, lucky_chance=lucky_chance)
+    GA.alter_survival(keep_old_pops=keep_old_population)
     GA.alter_mutation(master_mutation_rate=master_mut_chance, ann={'mut_chance':weight_mut_chance, 'sigma':mut_sigma})
     return GA

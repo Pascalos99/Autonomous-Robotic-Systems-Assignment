@@ -1,4 +1,5 @@
 import random
+import math
 from inspect import getfullargspec as fargs
 
 class Parameter:
@@ -131,9 +132,8 @@ class GeneticAlgorithm:
         self.mut_rate = master_mutation_rate
         self.genotype.alter_mutate(**mutation_kwargs)
     
-    def alter_crossover(self, keep_old_population=True, **crossover_kwargs):
+    def alter_crossover(self, **crossover_kwargs):
         # kwargs need to be named as the parameter they affect, with the value being the kwargs dictionary of the method it modifies
-        self.keep_pops = keep_old_population
         self.genotype.alter_crossover(**crossover_kwargs)
     
     def alter_selection(self, **selection_kwargs):
@@ -179,15 +179,17 @@ class GeneticAlgorithm:
         if not record_fitness and record_population: return populat_record
         if record_fitness and record_population: return fitness_record, populat_record
 
+# NOTE: we can use selection methods and survival methods interchangably!
 # ------------- #
 #   SELECTION   #
 # ------------- #
 
 def elitist_selection(population, elitist_percent=0.3, lucky_chance=0.1):
     popsize = len(population[list(population.keys())[0]])
-    elitists = int(round(elitist_percent * popsize))
+    elitists = int(max(math.ceil(elitist_percent), round(elitist_percent * popsize)))
     pop_elitist = {par: population[par][:elitists] for par in population.keys()}
-    index_lucky = random.sample(range(elitists, popsize), int(round(lucky_chance * (popsize - elitists))))
+    luckies = int(round(lucky_chance * (popsize - elitists)))
+    index_lucky = random.sample(range(elitists, popsize), luckies)
     return {par: pop_elitist[par] + [population[par][i] for i in index_lucky] for par in population.keys()}
 
 # ------------- #
