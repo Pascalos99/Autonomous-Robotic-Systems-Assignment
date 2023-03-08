@@ -25,7 +25,7 @@ class Player:
     def change_vel(self, left: float, right: float):
         self.vel[0] += left
         self.vel[1] += right
-        
+
     def set_vel(self, left: float, right: float):
         self.vel = [left, right]
 
@@ -193,10 +193,17 @@ class Player:
             sensor_line = sensor[0]
             intersect_points = []
 
-            for wall in self.map.lines:
-                intersect_coordinates = self.get_intersection_lines(sensor_line, wall)
-                if intersect_coordinates is not None:
-                    intersect_points.append(intersect_coordinates)
+            for wall in self.map.wall_rect_objects:
+                wall_segments = [
+                    [wall.topleft, wall.topright],
+                    [wall.topright, wall.bottomright],
+                    [wall.bottomright, wall.bottomleft],
+                    [wall.bottomleft, wall.topleft]
+                ]
+                for segment in wall_segments:
+                    intersect_coordinates = self.get_intersection_lines(sensor_line, segment)
+                    if intersect_coordinates is not None:
+                        intersect_points.append(intersect_coordinates)
 
             if intersect_points:
                 intersect_points = np.array(intersect_points)
@@ -218,7 +225,8 @@ class Player:
             self.sensor_lines[i][0] = np.array([[start_x, start_y], [end_x, end_y]], dtype=np.float64)
 
     @staticmethod
-    def get_intersection_lines(line_1: Union[list, np.ndarray], line_2: Union[list, np.ndarray]) -> Union[np.ndarray, None]:
+    def get_intersection_lines(line_1: Union[list, np.ndarray], line_2: Union[list, np.ndarray]) -> Union[
+        np.ndarray, None]:
         # Calculate intersection point between two lines using:
         # https://en.m.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment.
         x1, y1 = line_1[0]
@@ -242,7 +250,8 @@ class Player:
 
         return None
 
-    def get_intersection_circle_line(self, line: Union[list, np.ndarray], position: Union[list, np.ndarray], radius: float) -> Union[np.ndarray, None]:
+    def get_intersection_circle_line(self, line: Union[list, np.ndarray], position: Union[list, np.ndarray],
+                                     radius: float) -> Union[np.ndarray, None]:
         # Calculate the distance between the center of the circle and the line.
         x_diff = line[1][0] - line[0][0]
         y_diff = line[1][1] - line[0][1]

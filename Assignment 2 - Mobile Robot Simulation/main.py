@@ -23,6 +23,7 @@ FONT = pygame.font.SysFont('Consolas', 14)
 class Map:
     def __init__(self):
         self.lines = []
+        self.wall_rect_objects = []
 
     def add_line(self, pos_start, pos_end):
         self.lines.append([pos_start, pos_end])
@@ -68,7 +69,13 @@ class Simulation:
                            pygame.K_d: lambda: self.player.change_vel(-self.sensitivity, 0),
                            pygame.K_x: lambda: self.player.reset_vel(), }
 
+    def store_rect_objects(self):
+        for line in self.map.lines:
+            self.map.wall_rect_objects.append(pygame.draw.line(self.win, '#aaaaaa', line[0], line[1], width=2))
+
     def run(self):
+        self.store_rect_objects()
+
         is_running = True
         while is_running:
             for event in pygame.event.get():
