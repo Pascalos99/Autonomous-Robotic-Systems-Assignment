@@ -74,6 +74,7 @@ class Simulation:
             self.map.wall_rect_objects.append(pygame.draw.line(self.win, '#aaaaaa', line[0], line[1], width=2))
 
     def run(self):
+        pygame.mouse.set_cursor(pygame.cursors.diamond)
         self.store_rect_objects()
 
         is_running = True
@@ -92,6 +93,11 @@ class Simulation:
                     self.win = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
 
             self.player.step()
+            # print(self.player.pos)
+            # print(pygame.mouse.get_pos())
+            # print()
+            # a = pygame.draw.line(self.win, '#aaaaaa', (100, 100), (200, 200))
+            # print(a.topleft, a.topright, a.bottomright, a.bottomleft)
             self.player.calculate_sensor_distance()
             self.draw()
             self.clock.tick(FPS)

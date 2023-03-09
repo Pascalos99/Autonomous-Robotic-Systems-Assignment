@@ -124,7 +124,7 @@ class Player:
                         num_steps = 100
                         x_positions = np.linspace(current_position[0], new_position[0], num_steps)
                         y_positions = np.linspace(current_position[1], new_position[1], num_steps)
-                        while self.position_intersects_wall(new_position) == True and len(x_positions) > 0:
+                        while self.position_intersects_wall(new_position) and len(x_positions) > 0:
                             new_position = np.array([x_positions[-1], y_positions[-1]])
 
                             x_positions = np.delete(x_positions, -1)
@@ -180,7 +180,7 @@ class Player:
         # Lastly, check if the robot intersects with any of the walls using circle at location.
         for line in self.map.lines:
             intersection = self.get_intersection_circle_line(line, position, self.radius)
-            if intersection is not None and len(intersection) > 1:
+            if intersection is not None and len(intersection) > 0:
                 return True
 
         return False
@@ -200,6 +200,7 @@ class Player:
                     [wall.bottomright, wall.bottomleft],
                     [wall.bottomleft, wall.topleft]
                 ]
+
                 for segment in wall_segments:
                     intersect_coordinates = self.get_intersection_lines(sensor_line, segment)
                     if intersect_coordinates is not None:
