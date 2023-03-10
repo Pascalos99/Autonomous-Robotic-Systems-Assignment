@@ -46,6 +46,8 @@ class Genotype:
     def mutate_all(self, population, indices=None) -> None:
         if indices is None:
             indices = range(len(population))
+            # indices = range(len(population[list(population.keys())[0]]))
+            # TODO double check if this is an issue
         for param in self.params:
             for i in indices:
                 population[param][i] = self.__dict__[param].mutate(population[param][i], **self.__mutate_kwargs[param])
@@ -70,11 +72,6 @@ class Genotype:
                 else:
                     population[param] = population[param] + [None for _ in range(len(pop[list(pop.keys())[0]]))]
         return population
-    
-    # missing:
-    # * selection protocol
-    # * genetic algorithm framework
-    # * fitness sorting
 
 class Fitness:
     def __init__(self, compute: callable, minimize=False):
@@ -82,7 +79,7 @@ class Fitness:
         self.__compute = compute
         self.minimize = minimize
 
-    def individual(self, individual: dict, recompute=False):
+    def individual(self, individual: dict, recompute=False) -> float:
         if (not recompute) and ('fitness' in individual.keys()):
             fit = individual['fitness']
             if fit is not None: return fit
@@ -94,21 +91,22 @@ class Fitness:
             population['fitness'] = [None for i in range(len(population[list(population.keys())[0]]))]
         population['fitness'] = [population['fitness'][i] if population['fitness'][i] is not None else self.__compute({param: population[param][i] for param in population.keys()}) for i in range(len(population['fitness']))]
 
-    def population(self, population: dict, recompute=False):
+    def population(self, population: dict, recompute=False) -> list:
         self.compute(population, recompute)
         return population['fitness']
     
     def sort_population(self, population: dict, recompute=False) -> None:
         self.compute(population, recompute)
         sorted_index = sorted(range(len(population['fitness'])), key=lambda i: population['fitness'][i])
+        if not self.minimize: sorted_index.reverse()
         for par in population.keys():
             population[par] = [population[par][i] for i in sorted_index]
 
 class GeneticAlgorithm:
     def __init__(self, fitness: Fitness, genotype: Genotype, pairing: callable, selection: callable, survival: callable, population_size: int):
         # selection(population: dict) -> allowed_to_reproduce: dict
-        # survival(allowed_to_reproduce: dict) -> survivors: dict
         # pairing(population: dict, size: int) -> [(p1_index, p2_index), ...]: list(tuple) w/ len = size
+        # survival(allowed_to_reproduce: dict) -> survivors: dict
         self.fitness = fitness
         self.genotype = genotype
         self.pairing = pairing
