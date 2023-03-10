@@ -23,7 +23,8 @@ FONT = pygame.font.SysFont('Consolas', 14)
 class Map:
     def __init__(self):
         self.lines = []
-        self.wall_rect_objects = []
+        self.line_width = 2
+        self.wall_segments = []
 
     def add_line(self, pos_start, pos_end):
         self.lines.append([pos_start, pos_end])
@@ -49,6 +50,42 @@ class Map:
         for item in map_data:
             self.lines.append([item['start_pos'], item['end_pos']])
 
+            distance_x = abs(item['start_pos'][0] - item['end_pos'][0])
+            distance_y = abs(item['start_pos'][1] - item['end_pos'][1])
+            distance = np.sqrt(distance_x ** 2 + distance_y ** 2)
+
+            if self.line_width % 2 != 0:
+                first_width = (self.line_width - 1) // 2
+                second_width = (self.line_width - 1) // 2
+            else:
+                first_width = (self.line_width - 1) // 2
+                second_width = (self.line_width - 1) // 2 + 1
+
+            dis_x_a = distance_x / distance
+            dis_y_a = distance_y / distance
+
+            edge_1 = [
+                [(item['start_pos'][0] - (first_width * dis_y_a)), (item['start_pos'][1] + (second_width * dis_x_a))],
+                [(item['end_pos'][0] - (first_width * dis_y_a)), (item['end_pos'][1] + (second_width * dis_x_a))]
+            ]
+            edge_2 = [
+                [(item['end_pos'][0] - (first_width * dis_y_a)), (item['end_pos'][1] + (second_width * dis_x_a))],
+                [(item['end_pos'][0] + (second_width * dis_y_a)), (item['end_pos'][1] - (first_width * dis_x_a))]
+            ]
+            edge_3 = [
+                [(item['end_pos'][0] + (second_width * dis_y_a)), (item['end_pos'][1] - (first_width * dis_x_a))],
+                [(item['start_pos'][0] + (second_width * dis_y_a)), (item['start_pos'][1] - (first_width * dis_x_a))]
+            ]
+            edge_4 = [
+                [(item['start_pos'][0] + (second_width * dis_y_a)), (item['start_pos'][1] - (first_width * dis_x_a))],
+                [(item['start_pos'][0] - (first_width * dis_y_a)), (item['start_pos'][1] + (second_width * dis_x_a))]
+            ]
+
+            self.wall_segments.append(edge_1)
+            self.wall_segments.append(edge_2)
+            self.wall_segments.append(edge_3)
+            self.wall_segments.append(edge_4)
+
 
 class Simulation:
     def __init__(self):
@@ -69,14 +106,7 @@ class Simulation:
                            pygame.K_d: lambda: self.player.change_vel(-self.sensitivity, 0),
                            pygame.K_x: lambda: self.player.reset_vel(), }
 
-    def store_rect_objects(self):
-        for line in self.map.lines:
-            self.map.wall_rect_objects.append(pygame.draw.line(self.win, '#aaaaaa', line[0], line[1], width=2))
-
     def run(self):
-        pygame.mouse.set_cursor(pygame.cursors.diamond)
-        self.store_rect_objects()
-
         is_running = True
         while is_running:
             for event in pygame.event.get():
@@ -93,11 +123,6 @@ class Simulation:
                     self.win = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
 
             self.player.step()
-            # print(self.player.pos)
-            # print(pygame.mouse.get_pos())
-            # print()
-            # a = pygame.draw.line(self.win, '#aaaaaa', (100, 100), (200, 200))
-            # print(a.topleft, a.topright, a.bottomright, a.bottomleft)
             self.player.calculate_sensor_distance()
             self.draw()
             self.clock.tick(FPS)
@@ -115,7 +140,7 @@ class Simulation:
 
     def draw_map(self):
         for line in self.map.lines:
-            pygame.draw.line(self.win, '#aaaaaa', line[0], line[1], width=2)
+            pygame.draw.line(self.win, '#aaaaaa', line[0], line[1], width=self.map.line_width)
 
     def draw_player(self):
         # Draw Main Circle

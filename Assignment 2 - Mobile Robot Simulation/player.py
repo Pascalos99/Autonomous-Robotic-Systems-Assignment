@@ -68,7 +68,7 @@ class Player:
                 # Make robot move along the wall.
                 if np.array_equal(current_position, new_position):
                     circle_intersections = []
-                    for line in self.map.lines:
+                    for line in self.map.wall_segments:
                         intersection = self.get_intersection_circle_line(line, new_position, (self.radius + 1))
 
                         if intersection is not None:
@@ -171,14 +171,14 @@ class Player:
                         "upper": np.array([self.pos + [0, self.radius], position + [0, self.radius]]),
                         "bottom": np.array([self.pos - [0, self.radius], position - [0, self.radius]])}
 
-        for line in self.map.lines:
+        for line in self.map.wall_segments:
             for player_line in player_lines.values():
                 intersection = self.get_intersection_lines(line, player_line)
                 if intersection is not None:
                     return True
 
         # Lastly, check if the robot intersects with any of the walls using circle at location.
-        for line in self.map.lines:
+        for line in self.map.wall_segments:
             intersection = self.get_intersection_circle_line(line, position, self.radius)
             if intersection is not None and len(intersection) > 0:
                 return True
@@ -193,15 +193,7 @@ class Player:
             sensor_line = sensor[0]
             intersect_points = []
 
-            for wall in self.map.wall_rect_objects:
-                wall_segments = [
-                    [wall.topleft, wall.topright],
-                    [wall.topright, wall.bottomright],
-                    [wall.bottomright, wall.bottomleft],
-                    [wall.bottomleft, wall.topleft]
-                ]
-
-                for segment in wall_segments:
+            for segment in self.map.wall_segments:
                     intersect_coordinates = self.get_intersection_lines(sensor_line, segment)
                     if intersect_coordinates is not None:
                         intersect_points.append(intersect_coordinates)
@@ -209,7 +201,8 @@ class Player:
             if intersect_points:
                 intersect_points = np.array(intersect_points)
                 # Calculate all distances in numpy array with the Pythagorean theorem.
-                distance_array = np.sqrt(np.sum((intersect_points - sensor_line[0]) ** 2, axis=1))
+                # distance_array = np.sqrt(np.sum((intersect_points - sensor_line[0]) ** 2, axis=1))
+                distance_array = np.linalg.norm(intersect_points - sensor_line[0], axis=1)
                 self.sensor_lines[sensor_number][1] = np.amin(distance_array)
             else:
                 # Sensor line did not intersect with any objects, so reset distance number to the vision range.
