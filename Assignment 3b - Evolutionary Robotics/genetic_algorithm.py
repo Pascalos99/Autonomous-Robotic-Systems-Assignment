@@ -45,9 +45,7 @@ class Genotype:
     
     def mutate_all(self, population, indices=None) -> None:
         if indices is None:
-            indices = range(len(population))
-            # indices = range(len(population[list(population.keys())[0]]))
-            # TODO double check if this is an issue
+            indices = range(len(population[list(population.keys())[0]]))
         for param in self.params:
             for i in indices:
                 population[param][i] = self.__dict__[param].mutate(population[param][i], **self.__mutate_kwargs[param])
