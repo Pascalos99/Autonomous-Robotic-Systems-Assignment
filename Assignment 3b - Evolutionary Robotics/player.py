@@ -3,6 +3,8 @@ import pathlib
 from typing import Union
 
 import numpy as np
+import math
+from utils import normalize
 
 working_directory = pathlib.Path(__file__).parent.absolute()
 config = configparser.ConfigParser()
@@ -12,15 +14,32 @@ WIDTH, HEIGHT = float(config['PROGRAM']['window_width']), float(config['PROGRAM'
 
 
 class Player:
-    def __init__(self, player_map):
+    def __init__(self, player_map, dust_map=None):
         self.map = player_map
+        self.dust = dust_map
+        self.points = 0
+        self.collision_velocities = []
         self.pos = np.array([WIDTH / 2, HEIGHT / 2], dtype=np.float64)
         self.vel = [0, 0]
         self.radius = int(config['BOT']['radius'])
+        self.suck_radius = float(config['BOT']['suck_radius'])
         self.num_sensors = int(config['BOT']['num_sensors'])
         self.vision_range = int(config['BOT']['vision_range'])
         self.sensor_lines = {key: [None, self.vision_range] for key in range(self.num_sensors)}
         self.direction = -float(config['BOT']['direction']) * np.pi / 180
+        self.update_dust(record_points=False)
+
+    def update_dust(self, record_points=True):
+        if self.dust is not None:
+            sucked = self.dust.get_intersect(self.pos[0], self.pos[1], self.suck_radius)
+            self.dust.remove_particles(sucked)
+            if record_points: self.points += len(sucked)
+    
+    def regenerate_dust(self):
+        if self.dust.regen_rate > 0:
+            self.dust.regenerate()
+            cannot_regen = self.dust.get_intersect(self.pos[0], self.pos[1], self.radius)
+            self.dust.remove_particles(cannot_regen)
 
     def change_vel(self, left: float, right: float):
         self.vel[0] += left
@@ -47,23 +66,16 @@ class Player:
         # Check if position has moved.
         if not np.array_equal(self.pos, new_position):
             # Check if new position is inside a wall or has passed through a wall.
-            if self.position_intersects_wall(new_position):
+            collisions = self.position_intersects_wall(new_position)
+            if len(collisions) > 0:
+                # Save collision speed
+                self.collision_velocities.append(np.array(self.vel))
                 # Save the intended new position.
                 intended_new_position = new_position
 
                 # If so, move the player to the closest point on the wall.
                 # Number of steps to check between current and new position to find the closest point on the wall.
-                num_steps = 100
-                x_positions = np.linspace(current_position[0], new_position[0], num_steps)
-                y_positions = np.linspace(current_position[1], new_position[1], num_steps)
-                while self.position_intersects_wall(new_position) and len(x_positions) > 0:
-                    new_position = np.array([x_positions[-1], y_positions[-1]])
-
-                    x_positions = np.delete(x_positions, -1)
-                    y_positions = np.delete(y_positions, -1)
-
-                if len(x_positions) == 0:
-                    new_position = current_position
+                new_position = self.simple_line_collision(current_position, new_position, collisions)
 
                 # Make robot move along the wall.
                 if np.array_equal(current_position, new_position):
@@ -93,7 +105,8 @@ class Player:
                                 if denominator != 0:
                                     u = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denominator
                                     if u > 0:
-                                        # Wall intersects with the original movement direction of the robot so add it to the correct intersections.
+                                        # Wall intersects with the original movement direction of the robot
+                                        # so add it to the correct intersections.
                                         correct_intersections.append(intersection)
 
                             # Replace the circle intersections with the correct ones.
@@ -121,22 +134,57 @@ class Player:
                             new_position = new_position + velocity_vector
 
                         # Check if new position is inside a wall or has passed through a wall.
-                        num_steps = 100
-                        x_positions = np.linspace(current_position[0], new_position[0], num_steps)
-                        y_positions = np.linspace(current_position[1], new_position[1], num_steps)
-                        while self.position_intersects_wall(new_position) and len(x_positions) > 0:
-                            new_position = np.array([x_positions[-1], y_positions[-1]])
+                        collisions = self.position_intersects_wall(new_position)
+                        if len(collisions) > 0:
+                            new_position = self.simple_line_collision(current_position, new_position, collisions)
 
-                            x_positions = np.delete(x_positions, -1)
-                            y_positions = np.delete(y_positions, -1)
-
-                        if len(x_positions) == 0:
-                            new_position = current_position
+            self.update_dust()
+        self.regenerate_dust()
 
         # Update position and direction.
         self.pos[0] = new_position[0]
         self.pos[1] = new_position[1]
         self.direction = direction
+
+    def simple_line_collision(self, current_position, new_position, collisions):
+        return self.better_line_collision(current_position, new_position, collisions)
+
+        print(len(collisions))
+        print(collisions)
+        num_steps = 100
+        x_positions = np.linspace(current_position[0], new_position[0], num_steps)
+        y_positions = np.linspace(current_position[1], new_position[1], num_steps)
+        while self.position_intersects_wall(new_position) and len(x_positions) > 0:
+            new_position = np.array([x_positions[-1], y_positions[-1]])
+
+            x_positions = np.delete(x_positions, -1)
+            y_positions = np.delete(y_positions, -1)
+
+        if len(x_positions) == 0:
+            new_position = current_position
+        return new_position
+    
+    def better_line_collision(self, current_position, new_position, collisions):
+        if len(collisions) > 1:
+            return current_position
+        pos = np.array(new_position)
+        r = self.radius
+        p1, p2 = np.array(collisions[0][0]), np.array(collisions[0][1])
+        line = p2 - p1
+        alpha = line.dot(line)
+        beta = 2 * line.dot(p1 - pos)
+        gamma = p1.dot(p1) + pos.dot(pos) - 2 * p1.dot(pos) - r**2
+        D = beta**2 - 4 * alpha * gamma
+        if D < 0:
+            return new_position
+        sqrtD = math.sqrt(D)
+        t1 = (-beta + sqrtD) / (2 * alpha)
+        t2 = (-beta - sqrtD) / (2 * alpha)
+        if not (0 <= t1 <= 1 or 0 <= t2 <= 1):
+            return new_position
+        t = max(0, min(1, - beta / (2 * alpha)))
+        intersect = p1 + t * line
+        return intersect - normalize(intersect - pos)*(r*1.00001)
 
     def get_new_pose(self):
         if (self.ICC[0] == float('inf') or
@@ -170,20 +218,26 @@ class Player:
                         "right": np.array([self.pos + [self.radius, 0], position + [self.radius, 0]]),
                         "upper": np.array([self.pos + [0, self.radius], position + [0, self.radius]]),
                         "bottom": np.array([self.pos - [0, self.radius], position - [0, self.radius]])}
+        
+        intersected_segments = []
 
         for line in self.map.wall_segments:
             for player_line in player_lines.values():
                 intersection = self.get_intersection_lines(line, player_line)
                 if intersection is not None:
-                    return True
+                    if not line in intersected_segments:
+                        intersected_segments.append(line)
+                    break
 
         # Lastly, check if the robot intersects with any of the walls using circle at location.
         for line in self.map.wall_segments:
             intersection = self.get_intersection_circle_line(line, position, self.radius)
             if intersection is not None and len(intersection) > 0:
-                return True
+                if not line in intersected_segments:
+                    intersected_segments.append(line)
+                break
 
-        return False
+        return intersected_segments
 
     def calculate_sensor_distance(self):
         # First calculate the coordinates of the sensor lines
@@ -194,9 +248,9 @@ class Player:
             intersect_points = []
 
             for segment in self.map.wall_segments:
-                    intersect_coordinates = self.get_intersection_lines(sensor_line, segment)
-                    if intersect_coordinates is not None:
-                        intersect_points.append(intersect_coordinates)
+                intersect_coordinates = self.get_intersection_lines(sensor_line, segment)
+                if intersect_coordinates is not None:
+                    intersect_points.append(intersect_coordinates)
 
             if intersect_points:
                 intersect_points = np.array(intersect_points)

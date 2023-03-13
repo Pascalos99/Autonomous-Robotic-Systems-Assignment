@@ -1,7 +1,16 @@
 import numpy as np
 
+from neural_GA import get_ANN_GA, sigmoid, tanh
+
+
 def euclidian_dist(a_weights: list, b_weights: list) -> float:
-        return (sum([(a - b) ** 2 for a, b in zip(a_weights, b_weights)])) ** 0.5
+    return (sum([(a - b) ** 2 for a, b in zip(a_weights, b_weights)])) ** 0.5
+
+def normalize(x):
+    S = float(np.linalg.norm(x))
+    if S == 0: 
+        return x
+    return x/S
 
 def get_diversity_from_dist_matrix(m):
     acc = []
@@ -9,6 +18,7 @@ def get_diversity_from_dist_matrix(m):
         for col in range(row + 1, len(m[0])):
             acc.append(m[row][col])
     return sum(acc) / len(acc)
+
 
 def calc_diversity(population):
     anns = population['ann']
@@ -24,8 +34,9 @@ def calc_diversity(population):
     print(dist_matrix)
     diversity = get_diversity_from_dist_matrix(dist_matrix)
     return diversity
-    
+
+
 if __name__ == '__main__':
-    from neural_GA import get_ANN_GA
-    ga = get_ANN_GA(lambda x: 1, 14, 2, [4], popsize=5)
+    ga = get_ANN_GA(lambda x: 1, 14, 2, [4], popsize=5, activation_functions=[sigmoid, sigmoid, tanh])
+
     print(calc_diversity(ga.population))
