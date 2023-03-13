@@ -66,7 +66,7 @@ class Simulation:
 
             if bool(int(config['PROGRAM']['visualize_game'])):
                 self.draw()
-            print(self.player.vel)
+
             self.clock.tick(FPS)
 
     def ann_bridge(self, ann: ANN):
