@@ -6,6 +6,7 @@ import pygame
 
 from player import Player
 from maps import Map
+from dust_map import DustMap
 
 pygame.init()
 pygame.font.init()
@@ -24,7 +25,7 @@ class Simulation:
         self.clock = pygame.time.Clock()
         self.map = Map()
         self.map.load_map_from_json(f"{working_directory}/maps/{str(config['PROGRAM']['map_file'])}")
-        self.player = Player(self.map)
+        self.player = Player(self.map, DustMap())
 
         self.sensitivity = float(config['PROGRAM']['speed_step'])
 
@@ -62,7 +63,7 @@ class Simulation:
         self.clear()
         self.draw_fps()
         self.draw_map()
-        self.draw_player()
+        self.draw_player() # and dust
         pygame.display.flip()
 
     def draw_fps(self):
@@ -90,8 +91,8 @@ class Simulation:
             pygame.draw.line(self.win, '#dd0000', start_pos=[start_x, start_y, ], end_pos=[end_x, end_y, ], width=1)
 
         # Show motor numbers
-        x_text = FONT.render(f'l:{int(self.player.vel[1] / self.sensitivity)}', False, '#dddddd')
-        y_text = FONT.render(f'r:{int(self.player.vel[0] / self.sensitivity)}', False, '#dddddd')
+        x_text = FONT.render(f'l:{round(self.player.vel[1] / self.sensitivity, 1)}', False, '#dddddd')
+        y_text = FONT.render(f'r:{round(self.player.vel[0] / self.sensitivity, 1)}', False, '#dddddd')
         self.win.blit(x_text, dest=[
             self.player.pos[0] - x_text.get_width() // 2 + (self.player.radius // 2) * np.sin(self.player.direction),
             self.player.pos[1] - x_text.get_height() // 2 - (self.player.radius // 2) * np.cos(self.player.direction),
@@ -124,6 +125,10 @@ class Simulation:
                 distance = self.player.sensor_lines[i][1]
                 text = FONT.render(f"Sensor {i}: {int(round(distance, 0))}", False, '#dddddd')
                 self.win.blit(text, dest=[self.win.get_width() - 150, 50 + i * 15])
+        
+        # Draw Dust
+        if self.player.dust is not None:
+            self.player.dust.draw_dust(self.win)
 
     def clear(self):
         self.win.fill('#232323')

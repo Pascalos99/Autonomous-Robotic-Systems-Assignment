@@ -12,15 +12,31 @@ WIDTH, HEIGHT = float(config['PROGRAM']['window_width']), float(config['PROGRAM'
 
 
 class Player:
-    def __init__(self, player_map):
+    def __init__(self, player_map, dust_map=None):
         self.map = player_map
+        self.dust = dust_map
+        self.points = 0
         self.pos = np.array([WIDTH / 2, HEIGHT / 2], dtype=np.float64)
         self.vel = [0, 0]
         self.radius = int(config['BOT']['radius'])
+        self.suck_radius = float(config['BOT']['suck_radius'])
         self.num_sensors = int(config['BOT']['num_sensors'])
         self.vision_range = int(config['BOT']['vision_range'])
         self.sensor_lines = {key: [None, self.vision_range] for key in range(self.num_sensors)}
         self.direction = -float(config['BOT']['direction']) * np.pi / 180
+        self.update_dust(record_points=False)
+
+    def update_dust(self, record_points=True):
+        if self.dust is not None:
+            sucked = self.dust.get_intersect(self.pos[0], self.pos[1], self.suck_radius)
+            self.dust.regenerate()
+            self.dust.remove_particles(sucked)
+            if record_points: self.points += len(sucked)
+    
+    def regenerate_dust(self):
+        if self.dust.regen_rate > 0:
+            cannot_regen = self.dust.get_intersect(self.pos[0], self.pos[1], self.radius)
+            self.dust.remove_particles(cannot_regen)
 
     def change_vel(self, left: float, right: float):
         self.vel[0] += left
@@ -132,6 +148,9 @@ class Player:
 
                         if len(x_positions) == 0:
                             new_position = current_position
+
+            self.update_dust()
+        self.regenerate_dust()
 
         # Update position and direction.
         self.pos[0] = new_position[0]
