@@ -107,7 +107,7 @@ class Simulation:
         velocities = np.array(self.player.vel, dtype=np.float64) / float(config['ANN']['max_speed'])
 
         if self.ann_bridge_func is None:
-            self.ann_bridge_func = lambda ann, dist, vel: ann.forward(np.concatenate([dist, vel]))
+            self.ann_bridge_func = default_ann_bridge
 
         new_velocities = np.array(self.ann_bridge_func(self.ann, distances, velocities))
         self.player.vel = np.round(np.clip(new_velocities, -1, 1) * float(config['ANN']['max_speed']))
@@ -202,17 +202,44 @@ class Simulation:
         self.win.fill('#232323')
 
 
-def basic_fitness(individual):
-    viz = False
-    sim = Simulation(ann=individual['ann'], iterations=100, visualize_game=viz)
-    plr = sim.player
-    sim.run()
+def default_fitness_func(plr: Player):
+    return plr.points * 0.25 - len(plr.collision_velocities) - max_velocity(plr) ** 2
+
+def alter_fitness_func(plr: Player):
+    return plr.points - len(plr.collision_velocities) * max_velocity(plr)
+
+def default_ann_bridge(ann: ANN, dist, vel):
+    # assumes input neurons of # of sensors + 2
+    # assumes output neurons of 2
+    return ann.forward(np.concatenate([dist, vel]))
+
+def get_recurrent_ann_bridge(latent_size: int = 4, latent_layer=-2):
+    def recurrent_ann_bridge(ann: ANN, dist, vel):
+        # assumes input neurons of # of sensors + latent_size
+        # assumes hidden layer of size latent_size at index ann.layers[latent_layer]
+        # assumes output neurons of 2
+        latent = None
+        if ann.activations is None:
+            latent = np.zeros((latent_size,))
+        else: latent = ann.activations[latent_layer]
+        return ann.forward(np.concatenate([dist, latent]))
+    return recurrent_ann_bridge
+
+def max_velocity(plr: Player):
     maxvel = 0
     if len(plr.collision_velocities) > 0: maxvel = np.max(plr.collision_velocities)
-    print("finished sim with score", plr.points * 0.25, "-", len(plr.collision_velocities), "-", round(maxvel ** 2, 2),
-          "=",
-          plr.points * 0.25 - len(plr.collision_velocities) - maxvel ** 2)
-    return plr.points * 0.25 - len(plr.collision_velocities) - maxvel ** 2
+    return maxvel
+
+def get_basic_fitness(fitness_func=None, ann_bridge=None, iterations=100, visualize=False):
+    if fitness_func is None:
+        fitness_func = default_fitness_func
+
+    def basic_fitness(individual):
+        sim = Simulation(ann=individual['ann'], ann_bridge=ann_bridge, iterations=iterations, visualize_game=visualize)
+        plr = sim.player
+        sim.run()
+        return fitness_func(plr)
+    return basic_fitness
 
 
 def save_ann(ann: ANN):
@@ -229,12 +256,18 @@ def load_ann(ann_file: str):
 
 
 if __name__ == '__main__':
-    num_inputs, num_outputs = int(config['BOT']['num_sensors']) + 2, 2
-    hidden_layers = [3]
+    latent_size = 4
+    num_inputs, num_outputs = int(config['BOT']['num_sensors']) + latent_size, 2
+    hidden_layers = [latent_size]
     activation_functions = [sigmoid, tanh]
 
-    GA = get_ANN_GA(Fitness(basic_fitness), num_inputs, num_outputs, hidden_layers, activation_functions, popsize=1)
-    GA.iterate(15)
+    fitness = Fitness(get_basic_fitness(
+        ann_bridge=get_recurrent_ann_bridge(latent_size, -2),
+        iterations=100,
+        visualize=True))
+    
+    GA = get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers, activation_functions, popsize=5)
+    GA.iterate(2)
     sim = Simulation(ann=GA.population['ann'][0])
 
     # sim = Simulation()

@@ -15,6 +15,9 @@ def tanh(x):
     return np.tanh(x)
 
 
+def sigmoid_fitness_weighting(fitness1, fitness2):
+    return sigmoid(fitness1 - fitness2)
+
 class ANN:
     def __init__(self, num_inputs, num_outputs, hidden_layers=[], activation_functions=sigmoid):
         self.num_inputs = num_inputs
@@ -69,11 +72,48 @@ class FixedTopologyANN(ga.Parameter):
 
         ga.Parameter.__init__(self, init, mutate, crossover)
 
-
 def get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers=[], activation_functions=sigmoid, popsize=50, init_mu=0,
+                   init_sigma=0.5, avoid_asex=True, tournament_size=3, elitist_survival=0.1, lucky_survival=0.1, master_mut_chance=1.,
+                   weight_mut_chance=1., mut_sigma=0.1, crossover_fit_weighting=lambda p1, p2: 0.5):
+    # this implementation uses tournament selection and elitist survival
+    """
+    Parameters Explained: \n
+    * hidden_layers: a list containing integers representing the size of the networks' hidden layers
+        -- ex.: [3]: a single hidden layer of size 3, []: no hidden layers (we get a single-layer-perceptron)
+
+    * activation_functions: a list containing the activation functions of each layer len >= len(hidden_layers) + 1
+        -- alternatively, a single activation function can be given to set the activation the same for each layer
+
+    * init_mu: bias for initial weight values
+    * init_sigma: stdev for initial weight values
+    * avoid_asex: whether or not to avoid asexual reproduction
+    * tournament_size: the size of the tournament in tournament selection to determine who is allowed to reproduce
+    * elitist_survival: the top percentage of the reproducing population that's allowed to survive to the next generation
+    * lucky_chance: the chance for an individual in the lower fitness range to be allowed to survive
+    * master_mut_chance: the chance that a newborn individual is mutated
+    * weight_mut_chance: the chance that a weight of an individual is mutated (given that the individual is selected to mutate)
+    * mut_sigma: stdev of weight change attributed to a mutated weight
+
+    * crossover_fit_weighting: a function which determines the ratio at which the weights of two individuals are combined at crossover
+        -- the ratio depends on the fitness of each parent (does not need to be symmetric, but it is adviced to make it symmetric)
+    """
+
+    anngeno = ga.Genotype(ann=FixedTopologyANN(num_inputs, num_outputs, hidden_layers, activation_functions))
+    GA = ga.GeneticAlgorithm(fitness, anngeno, ga.random_pairing, ga.tournament_selection, ga.elitist_selection,
+                             population_size=popsize)
+    GA.initialize(ann={'mu': init_mu, 'sigma': init_sigma})
+    GA.alter_pairing(avoid_asex=avoid_asex)
+    GA.alter_crossover(fitness_weighting=crossover_fit_weighting)
+    GA.alter_selection(tournament_size=tournament_size)
+    GA.alter_survival(elitist_percent=elitist_survival, lucky_chance=lucky_survival)
+    GA.alter_mutation(master_mutation_rate=master_mut_chance, ann={'mut_chance': weight_mut_chance, 'sigma': mut_sigma})
+    return GA
+
+def get_ANN_GA_simple(fitness, num_inputs, num_outputs, hidden_layers=[], activation_functions=sigmoid, popsize=50, init_mu=0,
                init_sigma=0.5,
                avoid_asex=True, keep_old_population=True, elitist_percent=0.4, lucky_chance=0.2, master_mut_chance=1.,
                weight_mut_chance=1., mut_sigma=0.1, crossover_fit_weighting=lambda p1, p2: 0.5):
+    # this implementation uses elitist selection and binary survival
     """
     Parameters Explained: \n
     * hidden_layers: a list containing integers representing the size of the networks' hidden layers

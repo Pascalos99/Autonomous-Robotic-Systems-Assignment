@@ -10,6 +10,7 @@ from genetic_algorithm import Fitness
 from map import Map
 from neural_GA import ANN, sigmoid, tanh, get_ANN_GA
 from player import Player
+from simulation import default_ann_bridge, get_recurrent_ann_bridge
 
 working_directory = pathlib.Path(__file__).parent.absolute()
 config = configparser.ConfigParser()
