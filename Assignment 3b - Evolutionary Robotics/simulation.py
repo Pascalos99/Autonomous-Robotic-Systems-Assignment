@@ -1,5 +1,7 @@
 import configparser
 import pathlib
+import pickle
+import time
 
 import numpy as np
 import pygame
@@ -195,16 +197,30 @@ def basic_fitness(individual):
     return plr.points * 0.25 - len(plr.collision_velocities) - maxvel ** 2
 
 
+def save_ann(ann: ANN):
+    # Here UTC+0 time in ISO 8601 format is appended to make the filenames unique
+    filename = f"ann_object_{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}.pkl"
+    directory = f"{working_directory}/anns/{filename}"
+    with open(directory, 'wb') as f:
+        pickle.dump(ann, f)
+
+
+def load_ann(ann_file: str):
+    with open(ann_file, 'rb') as f:
+        return pickle.load(f)
+
+
 if __name__ == '__main__':
     num_inputs, num_outputs = int(config['BOT']['num_sensors']) + 2, 2
     hidden_layers = [3]
     activation_functions = [sigmoid, tanh]
 
-    # GA = get_ANN_GA(Fitness(basic_fitness), num_inputs, num_outputs, hidden_layers, activation_functions, popsize=25)
+    # GA = get_ANN_GA(Fitness(basic_fitness), num_inputs, num_outputs, hidden_layers, activation_functions, popsize=1)
     # GA.iterate(2)
     # sim = Simulation(ann=GA.population['ann'][0])
 
     sim = Simulation()
-
     sim.run()
     pygame.quit()
+
+    save_ann(GA.population['ann'][0])
