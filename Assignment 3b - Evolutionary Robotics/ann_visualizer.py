@@ -5,9 +5,9 @@ import numpy as np
 
 class ANN_Visualizer:
     def __init__(self, ann: ANN, win: pygame.Surface) -> None:
-        self.neuron_size = 15
+        self.neuron_size = 10
         self.neuron_gap = self.neuron_size + 10
-        self.layer_gap = 200
+        self.layer_gap = 125
         self.top_dist = 50
 
         self.neuron_positions = []
@@ -128,10 +128,13 @@ class ANN_Visualizer:
             return pygame.Color([conv_r(value), conv_g(value), conv_b(value)])
         
         if type == 'out': 
-            conv_r = interp1d([min(self.activations[layer]), max(self.activations[layer])], [50, 255])
-            conv_g = interp1d([min(self.activations[layer]), max(self.activations[layer])], [50, 112])
-            conv_b = interp1d([min(self.activations[layer]), max(self.activations[layer])], [50, 166])
-            return pygame.Color([conv_r(value), conv_g(value), conv_b(value)])
+            try:
+                conv_r = interp1d([-1., 1.], [50, 255])
+                conv_g = interp1d([-1., 1.], [50, 112])
+                conv_b = interp1d([-1., 1.], [50, 166])
+                return pygame.Color([conv_r(value), conv_g(value), conv_b(value)])
+            except ValueError:
+                print(self.activations[layer])
 
     def animate(self, ann):
         self.weights = ann.network
