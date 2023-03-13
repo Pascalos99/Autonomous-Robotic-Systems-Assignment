@@ -24,9 +24,9 @@ class ANN:
         self.network = [np.zeros((self.layers[i] + 1, self.layers[i + 1])) for i in range(len(self.layers) - 1)]
         self.activations = None
         if type(activation_functions) is not list:
-            self.activation_functions = [activation_functions for _ in range(len(self.layers))]
+            self.activation_functions = [activation_functions for _ in range(len(self.network))]
         else:
-            self.activation_functions = [activation_functions[i] for i in range(len(self.layers))]
+            self.activation_functions = [activation_functions[i] for i in range(len(self.network))]
 
     def forward(self, input):
         if not np.shape(input) == (self.num_inputs,):
