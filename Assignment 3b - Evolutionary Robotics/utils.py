@@ -37,6 +37,6 @@ def calc_diversity(population):
 
 
 if __name__ == '__main__':
-    ga = get_ANN_GA(lambda x: 1, 14, 2, [4], popsize=5, activation_functions=[sigmoid, sigmoid, tanh])
+    ga = get_ANN_GA(lambda x: 1, 14, 2, [4], popsize=5, activation_functions=[sigmoid, tanh])
 
     print(calc_diversity(ga.population))

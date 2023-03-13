@@ -1,14 +1,14 @@
 import configparser
+import math
 import pathlib
 
 import numpy as np
 import pygame
-import math
 
-from player import Player
 from dust_map import DustMap
+from map import Map
 from neural_GA import ANN
-from maps import Map
+from player import Player
 
 pygame.init()
 pygame.font.init()
@@ -23,15 +23,26 @@ FONT = pygame.font.SysFont('Consolas', 14)
 
 
 class Simulation:
-    def __init__(self, ann: ANN = None, iterations: int = None, visualize_game: bool = False):
+    def __init__(self, ann: ANN = None, iterations: int = None, visualize_game: bool = True, map_file: str = None):
         self.ann = ann
         self.iterations = iterations
         self.iter_counter = 0
         self.visualize_game = visualize_game
+        self.map_file = map_file
+        self.map = map
+        self.manual_mode = 0
         self.win = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
         self.map = Map()
-        self.map.load_map_from_json(f"{working_directory}/maps/{str(config['ANN']['map_file'])}")
+
+        if self.ann is None:
+            self.manual_mode = 1
+
+        if self.map_file is None:
+            self.map_file = str(config['ANN']['map_file'])
+
+        self.map.load_map_from_json(f"{working_directory}/maps/{self.map_file}")
+
         # self.min_x, self.min_y, self.max_x, self.max_y
         bounds = (float(config['DUST']['min_x']), float(config['DUST']['min_y']), float(config['DUST']['max_x']),
                   float(config['DUST']['max_y']))
@@ -54,14 +65,14 @@ class Simulation:
     def run(self):
         is_running = True
         while is_running:
-            # if self.iter_counter == self.iterations:
-            #     is_running = False
+            if self.iter_counter == self.iterations:
+                is_running = False
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     is_running = False
 
-                if event.type == pygame.KEYDOWN and config.getboolean('PROGRAM', 'manual_mode'):
+                if event.type == pygame.KEYDOWN and self.manual_mode:
                     try:
                         self.key_config[event.key]()
                     except KeyError:
@@ -73,7 +84,7 @@ class Simulation:
             self.player.step()
             self.player.calculate_sensor_distance()
 
-            if not config.getboolean('PROGRAM', 'manual_mode'):
+            if not self.manual_mode:
                 self.ann_bridge()
 
             if self.visualize_game:
@@ -93,8 +104,8 @@ class Simulation:
         distances = np.array([dict_list[1] for dict_list in self.player.sensor_lines.values()], dtype=np.float64)
         velocities = np.array(self.player.vel, dtype=np.float64)
 
-        new_velocities = np.array(self.ann.forward(np.concatenate([distances, velocities])))
-        self.player.vel = new_velocities * int(config['ANN']['max_speed'])
+        velocity_change = np.round(np.array(self.ann.forward(np.concatenate([distances, velocities]))))
+        self.player.vel += velocity_change
 
     def draw(self):
         self.clear()
@@ -142,8 +153,9 @@ class Simulation:
                 self.player.direction), ])
         self.win.blit(y_text, dest=[(self.player.pos[0] - y_text.get_width() // 2 + (self.player.radius // 2) * np.sin(
             np.pi + self.player.direction)), (
-                    self.player.pos[1] - y_text.get_height() // 2 - (self.player.radius // 2) * np.cos(
-                np.pi + self.player.direction)), ])
+                                            self.player.pos[1] - y_text.get_height() // 2 - (
+                                                self.player.radius // 2) * np.cos(
+                                        np.pi + self.player.direction)), ])
 
         # Show Distance Numbers
         for i in range(self.player.num_sensors):
@@ -156,8 +168,9 @@ class Simulation:
 
             self.win.blit(text, dest=[(self.player.pos[0] - text.get_width() // 2 + (self.player.radius + 20) * np.cos(
                 i * angle - self.player.direction)), (
-                        self.player.pos[1] - text.get_height() // 2 - (self.player.radius + 20) * np.sin(
-                    i * angle - self.player.direction)), ])
+                                              self.player.pos[1] - text.get_height() // 2 - (
+                                                  self.player.radius + 20) * np.sin(
+                                          i * angle - self.player.direction)), ])
 
         if config.getboolean('PROGRAM', 'sensor_data_separate'):
             for i in range(self.player.num_sensors):
@@ -170,6 +183,6 @@ class Simulation:
 
 
 if __name__ == '__main__':
-    sim = Simulation()
+    sim = Simulation(visualize_game=True)
     sim.run()
     pygame.quit()
