@@ -78,6 +78,8 @@ class Simulation:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     is_running = False
+                    pygame.quit()
+                    quit()
 
                 if event.type == pygame.KEYDOWN and self.manual_mode:
                     try:
@@ -267,7 +269,7 @@ if __name__ == '__main__':
         visualize=True))
     
     GA = get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers, activation_functions, popsize=5)
-    GA.iterate(2)
+    GA.iterate(10)
     sim = Simulation(ann=GA.population['ann'][0])
 
     # sim = Simulation()
