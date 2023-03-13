@@ -157,11 +157,13 @@ class GeneticAlgorithm:
         # kwargs are fed directly into the pairing method defined at initialization
         self.pairingpars = pairing_kwargs
 
-    def iterate(self, num_iters, record_fitness=True, record_population=False):
+    def iterate(self, num_iters, record_fitness=True, record_population=False, display_iterations=False):
         fitness_record = []
         populat_record = []
 
         for i in range(num_iters):
+            if display_iterations:
+                print(f"Iteration { i + 1 }/{ num_iters }")
             # determine population fitness:
             self.fitness.sort_population(self.population, i == 0)
             if record_fitness: fitness_record.append(list(self.population['fitness']))
