@@ -190,15 +190,21 @@ def elitist_selection(population, elitist_percent=0.3, lucky_chance=0.1):
 
 
 def tournament_selection(population, tournament_size=3):
+    maximize = True
+    if population["fitness"][0] < population["fitness"][-1]:
+        maximize = False
+    
     population_size = len(population[list(population.keys())[0]])
     winners = { par: [] for par in population.keys() }
     for _ in range(population_size):
         competitors = { par: population[par] for par in population.keys() }
         tournament_indexes = random.sample(range(0, len(competitors[list(competitors.keys())[0]])), tournament_size)
         tournament = { key: [values[i] for i in tournament_indexes] for key, values in competitors.items() }
-        # TODO: Change max in the line below to reflect if you want to minimize or maximize.
-        winner = { key: [values[i] for i in [tournament["fitness"].index(max(tournament["fitness"]))]] for key, values in tournament.items() }
-
+        if maximize:
+            winner = { key: [values[i] for i in [tournament["fitness"].index(max(tournament["fitness"]))]] for key, values in tournament.items() }
+        else:
+            winner = { key: [values[i] for i in [tournament["fitness"].index(min(tournament["fitness"]))]] for key, values in tournament.items() }
+            
         for key in winner:
             winners[key].append(winner[key][0])
     
