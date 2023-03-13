@@ -9,7 +9,10 @@ def within_circle(x1, y1, x2, y2, r):
     return dx*dx + dy*dy <= r*r
 
 class DustMap:
-    def __init__(self, bounds=(0,0,1200,1200), regen_rate=0.001, density=0.03, random_state=None):
+    def __init__(self, bounds=(0,0,1200,1200), regen_rate=0.0001, density=0.01, random_state=None):
+        if type(random_state) is str:
+            if random_state == 'None': random_state = None
+            else: random_state = int(random_state)
         self.density = density
         self.regen_rate = regen_rate
         self.min_x, self.min_y, self.max_x, self.max_y = bounds
@@ -64,10 +67,9 @@ class DustMap:
     def draw_dust(self, surface: pygame.Surface, particle_size=1):
         draw_index = set.difference({k for k in self.particles.keys()}, self.removed)
         points = [self.particles[p] for p in draw_index]
-        # points = [self.particles[p] for p in self.particles.keys()]
         for p in points:
             x, y = p
-            pygame.draw.circle(surface=surface, color=pygame.Color(255,255,0), center=(x, y), radius=particle_size)
+            pygame.draw.circle(surface=surface, color=pygame.Color(120,120,60), center=(x, y), radius=particle_size)
 
 if __name__ == '__main__':
     dm = DustMap()

@@ -29,12 +29,12 @@ class Player:
     def update_dust(self, record_points=True):
         if self.dust is not None:
             sucked = self.dust.get_intersect(self.pos[0], self.pos[1], self.suck_radius)
-            self.dust.regenerate()
             self.dust.remove_particles(sucked)
             if record_points: self.points += len(sucked)
     
     def regenerate_dust(self):
         if self.dust.regen_rate > 0:
+            self.dust.regenerate()
             cannot_regen = self.dust.get_intersect(self.pos[0], self.pos[1], self.radius)
             self.dust.remove_particles(cannot_regen)
 

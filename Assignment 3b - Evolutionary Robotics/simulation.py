@@ -1,6 +1,4 @@
 import configparser
-import datetime
-import json
 import pathlib
 
 import numpy as np
@@ -29,9 +27,13 @@ class Simulation:
         self.clock = pygame.time.Clock()
         self.map = Map()
         self.map.load_map_from_json(f"{working_directory}/maps/{str(config['ANN']['map_file'])}")
-        self.player = Player(self.map, DustMap())
+        #self.min_x, self.min_y, self.max_x, self.max_y
+        bounds = (float(config['DUST']['min_x']), float(config['DUST']['min_y']), float(config['DUST']['max_x']), float(config['DUST']['max_y']))
+        self.player = Player(self.map, DustMap(bounds,
+                            float(config['DUST']['regen_rate']), float(config['DUST']['density']), str(config['DUST']['random_state'])))
 
         self.sensitivity = float(config['ANN']['speed_step'])
+        self.do_draw_dust = config.getboolean('DUST', 'draw')
 
         # In the README.md is explained how the bot is controlled with a keyboard.
         self.key_config = {pygame.K_q: lambda: self.player.change_vel(0, self.sensitivity),
@@ -67,7 +69,8 @@ class Simulation:
 
             if bool(int(config['PROGRAM']['visualize_game'])):
                 self.draw()
-            print(self.player.vel)
+            # print(self.player.vel)
+            print(self.player.points)
             self.clock.tick(FPS)
 
     def ann_bridge(self, ann: ANN):
@@ -81,7 +84,8 @@ class Simulation:
         self.clear()
         self.draw_fps()
         self.draw_map()
-        self.draw_player() # and dust
+        self.draw_player()
+        if self.do_draw_dust: self.draw_dust()
         pygame.display.flip()
 
     def draw_fps(self):
@@ -91,6 +95,11 @@ class Simulation:
     def draw_map(self):
         for line in self.map.lines:
             pygame.draw.line(self.win, '#aaaaaa', line[0], line[1], width=self.map.line_width)
+
+    def draw_dust(self):
+        # Draw Dust
+        if self.player.dust is not None:
+            self.player.dust.draw_dust(self.win)
 
     def draw_player(self):
         # Draw Main Circle
@@ -143,10 +152,6 @@ class Simulation:
                 distance = self.player.sensor_lines[i][1]
                 text = FONT.render(f"Sensor {i}: {int(round(distance, 0))}", False, '#dddddd')
                 self.win.blit(text, dest=[self.win.get_width() - 150, 50 + i * 15])
-
-        # Draw Dust
-        if self.player.dust is not None:
-            self.player.dust.draw_dust(self.win)
 
     def clear(self):
         self.win.fill('#232323')
