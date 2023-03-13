@@ -10,6 +10,7 @@ from dust_map import DustMap
 from genetic_algorithm import Fitness
 from map import Map
 from neural_GA import ANN, sigmoid, tanh, get_ANN_GA
+from ann_visualizer import ANN_Visualizer
 from player import Player
 
 pygame.init()
@@ -56,6 +57,8 @@ class Simulation:
 
         self.sensitivity = float(config['ANN']['speed_step'])
         self.do_draw_dust = config.getboolean('DUST', 'draw')
+
+        self.ANN_Viz = None
 
         # In the README.md is explained how the bot is controlled with a keyboard.
         self.key_config = {pygame.K_q: lambda: self.player.change_vel(0, self.sensitivity),
@@ -115,6 +118,7 @@ class Simulation:
         self.draw_map()
         self.draw_player()
         if self.do_draw_dust: self.draw_dust()
+        self.draw_ann()
         pygame.display.flip()
 
     def draw_fps(self):
@@ -180,6 +184,20 @@ class Simulation:
                 text = FONT.render(f"Sensor {i}: {int(round(distance, 0))}", False, '#dddddd')
                 self.win.blit(text, dest=[self.win.get_width() - 150, 50 + i * 15])
 
+    def draw_ann(self):
+        if not self.ann: return 
+        if not self.ann.network: return 
+        if not self.ann.activations: return
+
+        if not self.ANN_Viz:
+            self.ANN_Viz = ANN_Visualizer(self.ann, self.win)
+
+        img = self.ANN_Viz.animate(self.ann)
+        self.win.blit(
+            source=img,
+            dest=(self.win.get_rect().width - img.get_rect().width, 0)
+        )
+
     def clear(self):
         self.win.fill('#232323')
 
@@ -216,10 +234,10 @@ if __name__ == '__main__':
     activation_functions = [sigmoid, tanh]
 
     GA = get_ANN_GA(Fitness(basic_fitness), num_inputs, num_outputs, hidden_layers, activation_functions, popsize=1)
-    GA.iterate(2)
+    GA.iterate(15)
     sim = Simulation(ann=GA.population['ann'][0])
 
-    sim = Simulation()
+    # sim = Simulation()
     sim.run()
     pygame.quit()
 
