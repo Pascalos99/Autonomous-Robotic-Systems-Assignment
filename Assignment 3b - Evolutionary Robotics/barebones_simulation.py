@@ -10,12 +10,12 @@ from genetic_algorithm import Fitness
 from map import Map
 from neural_GA import ANN, sigmoid, tanh, get_ANN_GA
 from player import Player
-from simulation import default_ann_bridge, get_recurrent_ann_bridge
+from simulation import default_ann_bridge, get_recurrent_ann_bridge, default_fitness_func
 
 working_directory = pathlib.Path(__file__).parent.absolute()
 config = configparser.ConfigParser()
 config.read(f"{working_directory}/config.ini")
-
+training_maps = [f"train/map_{i}.json" for i in range(1,19)]
 
 class MiniSim:
     def __init__(self, ann: ANN, ann_bridge: callable, map_to_load: str):
@@ -40,16 +40,26 @@ class MiniSim:
             self.player.vel = np.clip(new_velocities, -1, 1) * float(config['ANN']['max_speed'])
 
 
-def basic_fitness(individual):
-    sim = MiniSim(individual['ann'], lambda ann, dist, vel: ann.forward(np.concatenate([dist, vel])), "map_2.json")
-    plr = sim.player
-    sim.run(100)
-    maxvel = 0
-    if len(plr.collision_velocities) > 0: maxvel = np.max(plr.collision_velocities)
-    print("finished sim with score", plr.points * 0.25, "-", len(plr.collision_velocities), "-", round(maxvel ** 2, 2),
-          "=",
-          plr.points * 0.25 - len(plr.collision_velocities) - maxvel ** 2)
-    return plr.points * 0.25 - len(plr.collision_velocities) - maxvel ** 2
+def get_average_fitness(fitness_func=None, ann_bridge=None, iterations_per_map=100, maps_to_load=None):
+    if fitness_func is None:
+        fitness_func = default_fitness_func
+    if ann_bridge is None:
+        ann_bridge = default_ann_bridge
+    if maps_to_load is None:
+        maps_to_load = training_maps
+
+    def average_fitness(individual):
+        print("Evaluating individual:")
+        fitness = 0
+        for i in range(len(maps_to_load)):
+            print(f'-- starting simulator on map "{maps_to_load[i]}"...')
+            sim = MiniSim(individual['ann'], ann_bridge, maps_to_load[i])
+            plr = sim.player
+            sim.run(iterations_per_map)
+            fitness += fitness_func(plr)
+            print(f'-- total fitness of individual updated to {round(fitness/(i+1),2)}')
+        return fitness / float(len(maps_to_load))
+    return average_fitness
 
 
 def save_ann(ann: ANN):
@@ -66,15 +76,23 @@ def load_ann(ann_file: str):
 
 
 if __name__ == '__main__':
-    num_inputs, num_outputs = int(config['BOT']['num_sensors']) + 2, 2
-    hidden_layers = [4]
+    latent_size = 4
+    num_inputs, num_outputs = int(config['BOT']['num_sensors']) + latent_size, 2
+    hidden_layers = [latent_size]
     activation_functions = [sigmoid, tanh]
-    GA = get_ANN_GA(Fitness(basic_fitness), num_inputs, num_outputs, hidden_layers, activation_functions, popsize=25)
+    ann_bridge = get_recurrent_ann_bridge(latent_size)
+    fitness = Fitness(get_average_fitness(
+        fitness_func=default_fitness_func,
+        ann_bridge=ann_bridge,
+        iterations_per_map=100,
+        maps_to_load = training_maps[:3]
+    ))
+    GA = get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers, activation_functions, popsize=25)
     GA.iterate(2)
+
     import pygame
     from simulation import Simulation
-
-    sim = Simulation(ann=GA.population['ann'][0])
+    sim = Simulation(ann=GA.population['ann'][0], ann_bridge=ann_bridge)
     sim.run()
     pygame.quit()
 
