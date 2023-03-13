@@ -1,12 +1,15 @@
 import configparser
+import datetime
+import json
 import pathlib
 
 import numpy as np
 import pygame
 
 from player import Player
-from maps import Map
 from dust_map import DustMap
+from neural_GA import ANN
+from maps import Map
 
 pygame.init()
 pygame.font.init()
@@ -19,15 +22,16 @@ WIDTH, HEIGHT = float(config['PROGRAM']['window_width']), float(config['PROGRAM'
 FPS = float(config['PROGRAM']['fps'])
 FONT = pygame.font.SysFont('Consolas', 14)
 
+
 class Simulation:
     def __init__(self):
         self.win = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
         self.map = Map()
-        self.map.load_map_from_json(f"{working_directory}/maps/{str(config['PROGRAM']['map_file'])}")
+        self.map.load_map_from_json(f"{working_directory}/maps/{str(config['ANN']['map_file'])}")
         self.player = Player(self.map, DustMap())
 
-        self.sensitivity = float(config['PROGRAM']['speed_step'])
+        self.sensitivity = float(config['ANN']['speed_step'])
 
         # In the README.md is explained how the bot is controlled with a keyboard.
         self.key_config = {pygame.K_q: lambda: self.player.change_vel(0, self.sensitivity),
@@ -45,7 +49,7 @@ class Simulation:
                 if event.type == pygame.QUIT:
                     is_running = False
 
-                if event.type == pygame.KEYDOWN:
+                if event.type == pygame.KEYDOWN and bool(int(config['PROGRAM']['manual_mode'])):
                     try:
                         self.key_config[event.key]()
                     except KeyError:
@@ -56,8 +60,22 @@ class Simulation:
 
             self.player.step()
             self.player.calculate_sensor_distance()
-            self.draw()
+
+            if not bool(int(config['PROGRAM']['manual_mode'])):
+                ann = ANN(14, 2, [4])
+                self.ann_bridge(ann)
+
+            if bool(int(config['PROGRAM']['visualize_game'])):
+                self.draw()
+            print(self.player.vel)
             self.clock.tick(FPS)
+
+    def ann_bridge(self, ann: ANN):
+        distances = np.array([dict_list[1] for dict_list in self.player.sensor_lines.values()], dtype=np.float64)
+        velocities = np.array(self.player.vel, dtype=np.float64)
+        print(np.concatenate([distances, velocities]))
+        new_velocities = np.array(ann.forward(np.concatenate([distances, velocities])))
+        self.player.vel = new_velocities * int(config['ANN']['max_speed'])
 
     def draw(self):
         self.clear()
@@ -125,7 +143,7 @@ class Simulation:
                 distance = self.player.sensor_lines[i][1]
                 text = FONT.render(f"Sensor {i}: {int(round(distance, 0))}", False, '#dddddd')
                 self.win.blit(text, dest=[self.win.get_width() - 150, 50 + i * 15])
-        
+
         # Draw Dust
         if self.player.dust is not None:
             self.player.dust.draw_dust(self.win)

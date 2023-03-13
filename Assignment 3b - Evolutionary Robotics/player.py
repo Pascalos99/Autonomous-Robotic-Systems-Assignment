@@ -109,7 +109,8 @@ class Player:
                                 if denominator != 0:
                                     u = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denominator
                                     if u > 0:
-                                        # Wall intersects with the original movement direction of the robot so add it to the correct intersections.
+                                        # Wall intersects with the original movement direction of the robot
+                                        # so add it to the correct intersections.
                                         correct_intersections.append(intersection)
 
                             # Replace the circle intersections with the correct ones.
@@ -213,9 +214,9 @@ class Player:
             intersect_points = []
 
             for segment in self.map.wall_segments:
-                    intersect_coordinates = self.get_intersection_lines(sensor_line, segment)
-                    if intersect_coordinates is not None:
-                        intersect_points.append(intersect_coordinates)
+                intersect_coordinates = self.get_intersection_lines(sensor_line, segment)
+                if intersect_coordinates is not None:
+                    intersect_points.append(intersect_coordinates)
 
             if intersect_points:
                 intersect_points = np.array(intersect_points)
