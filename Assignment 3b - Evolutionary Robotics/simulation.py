@@ -215,9 +215,9 @@ if __name__ == '__main__':
     hidden_layers = [3]
     activation_functions = [sigmoid, tanh]
 
-    # GA = get_ANN_GA(Fitness(basic_fitness), num_inputs, num_outputs, hidden_layers, activation_functions, popsize=1)
-    # GA.iterate(2)
-    # sim = Simulation(ann=GA.population['ann'][0])
+    GA = get_ANN_GA(Fitness(basic_fitness), num_inputs, num_outputs, hidden_layers, activation_functions, popsize=1)
+    GA.iterate(2)
+    sim = Simulation(ann=GA.population['ann'][0])
 
     sim = Simulation()
     sim.run()
