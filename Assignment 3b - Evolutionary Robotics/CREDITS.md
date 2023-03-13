@@ -9,4 +9,6 @@
 * 
 
 ### Körver, Bas
-* 
+* Robot IO
+* Maps
+* Save en load ANN class object
