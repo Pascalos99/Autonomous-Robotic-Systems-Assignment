@@ -7,7 +7,8 @@ import math
 
 from player import Player
 from dust_map import DustMap
-from neural_GA import ANN
+from neural_GA import ANN, sigmoid, tanh, get_ANN_GA
+from genetic_algorithm import Fitness
 from maps import Map
 
 pygame.init()
@@ -23,8 +24,9 @@ FONT = pygame.font.SysFont('Consolas', 14)
 
 
 class Simulation:
-    def __init__(self, ann: ANN = None, iterations: int = None, visualize_game: bool = False):
+    def __init__(self, ann: ANN = None, ann_bridge: callable=None, iterations: int = None, visualize_game: bool = True):
         self.ann = ann
+        self.ann_bridge_func = ann_bridge
         self.iterations = iterations
         self.iter_counter = 0
         self.visualize_game = visualize_game
@@ -54,8 +56,8 @@ class Simulation:
     def run(self):
         is_running = True
         while is_running:
-            # if self.iter_counter == self.iterations:
-            #     is_running = False
+            if self.iterations is not None and self.iter_counter >= self.iterations:
+                is_running = False
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -84,17 +86,21 @@ class Simulation:
             if len(player_speeds) > 0:
                 mean = np.mean(player_speeds)
                 maxx = np.max(player_speeds)
-            print(self.player.points, "points, ", len(self.player.collision_velocities), "collisions, at", mean,
-                  "average speed, and", maxx, "max speed")
-            self.clock.tick(FPS)
+            # print(self.player.points, "points, ", len(self.player.collision_velocities), "collisions, at", mean,
+                #   "average speed, and", maxx, "max speed")
+            if self.visualize_game:
+                self.clock.tick(FPS)
             self.iter_counter += 1
 
     def ann_bridge(self):
-        distances = np.array([dict_list[1] for dict_list in self.player.sensor_lines.values()], dtype=np.float64)
-        velocities = np.array(self.player.vel, dtype=np.float64)
+        distances = np.array([dict_list[1] for dict_list in self.player.sensor_lines.values()], dtype=np.float64) / float(config['BOT']['vision_range'])
+        velocities = np.array(self.player.vel, dtype=np.float64) / float(config['ANN']['max_speed'])
 
-        new_velocities = np.array(self.ann.forward(np.concatenate([distances, velocities])))
-        self.player.vel = new_velocities * int(config['ANN']['max_speed'])
+        if self.ann_bridge_func is None:
+            self.ann_bridge_func = lambda ann, dist, vel: ann.forward(np.concatenate([dist, vel]))
+        new_velocities = np.array(self.ann_bridge_func(self.ann, distances, velocities))
+        # print(new_velocities)
+        self.player.vel = np.clip(new_velocities, -1, 1) * float(config['ANN']['max_speed'])
 
     def draw(self):
         self.clear()
@@ -168,8 +174,23 @@ class Simulation:
     def clear(self):
         self.win.fill('#232323')
 
+def basic_fitness(individual):
+    viz = False
+    sim = Simulation(ann=individual['ann'], iterations=100, visualize_game=viz)
+    plr = sim.player
+    sim.run()
+    maxvel = 0
+    if len(plr.collision_velocities) > 0: maxvel = np.max(plr.collision_velocities)
+    print("finished sim with score", plr.points * 0.25,"-",len(plr.collision_velocities),"-",round(maxvel**2,2),"=",
+          plr.points * 0.25 - len(plr.collision_velocities) - maxvel**2)
+    return plr.points * 0.25 - len(plr.collision_velocities) - maxvel**2
 
 if __name__ == '__main__':
-    sim = Simulation()
+    num_inputs, num_outputs = int(config['BOT']['num_sensors'])+2, 2
+    hidden_layers = [3]
+    activation_functions = [sigmoid, tanh]
+    GA = get_ANN_GA(Fitness(basic_fitness), num_inputs, num_outputs, hidden_layers, activation_functions, popsize=25)
+    GA.iterate(10)
+    sim = Simulation(ann=GA.population['ann'][0])
     sim.run()
     pygame.quit()
