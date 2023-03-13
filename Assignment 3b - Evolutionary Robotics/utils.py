@@ -6,6 +6,11 @@ from neural_GA import get_ANN_GA, sigmoid, tanh
 def euclidian_dist(a_weights: list, b_weights: list) -> float:
     return (sum([(a - b) ** 2 for a, b in zip(a_weights, b_weights)])) ** 0.5
 
+def normalize(x):
+    S = float(np.linalg.norm(x))
+    if S == 0: 
+        return x
+    return x/S
 
 def get_diversity_from_dist_matrix(m):
     acc = []
