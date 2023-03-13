@@ -3,7 +3,6 @@ import pathlib
 
 import numpy as np
 import pygame
-import math
 
 from player import Player
 from dust_map import DustMap
@@ -34,7 +33,6 @@ class Simulation:
         self.clock = pygame.time.Clock()
         self.map = Map()
         self.map.load_map_from_json(f"{working_directory}/maps/{str(config['ANN']['map_file'])}")
-        # self.min_x, self.min_y, self.max_x, self.max_y
         bounds = (float(config['DUST']['min_x']), float(config['DUST']['min_y']), float(config['DUST']['max_x']),
                   float(config['DUST']['max_y']))
         self.player = Player(self.map,
@@ -81,13 +79,6 @@ class Simulation:
             if self.visualize_game:
                 self.draw()
 
-            player_speeds = [math.sqrt(v[0] ** 2 + v[1] ** 2) for v in self.player.collision_velocities]
-            mean, maxx = 0, 0
-            if len(player_speeds) > 0:
-                mean = np.mean(player_speeds)
-                maxx = np.max(player_speeds)
-            # print(self.player.points, "points, ", len(self.player.collision_velocities), "collisions, at", mean,
-                #   "average speed, and", maxx, "max speed")
             if self.visualize_game:
                 self.clock.tick(FPS)
             self.iter_counter += 1
@@ -190,7 +181,7 @@ if __name__ == '__main__':
     hidden_layers = [3]
     activation_functions = [sigmoid, tanh]
     GA = get_ANN_GA(Fitness(basic_fitness), num_inputs, num_outputs, hidden_layers, activation_functions, popsize=25)
-    GA.iterate(10)
+    GA.iterate(2)
     sim = Simulation(ann=GA.population['ann'][0])
     sim.run()
     pygame.quit()
