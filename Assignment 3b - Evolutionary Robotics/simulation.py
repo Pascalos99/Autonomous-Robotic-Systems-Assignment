@@ -23,15 +23,21 @@ FONT = pygame.font.SysFont('Consolas', 14)
 
 
 class Simulation:
-    def __init__(self):
+    def __init__(self, ann: ANN = None, iterations: int = None, visualize_game: bool = False):
+        self.ann = ann
+        self.iterations = iterations
+        self.iter_counter = 0
+        self.visualize_game = visualize_game
         self.win = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
         self.map = Map()
         self.map.load_map_from_json(f"{working_directory}/maps/{str(config['ANN']['map_file'])}")
-        #self.min_x, self.min_y, self.max_x, self.max_y
-        bounds = (float(config['DUST']['min_x']), float(config['DUST']['min_y']), float(config['DUST']['max_x']), float(config['DUST']['max_y']))
-        self.player = Player(self.map, DustMap(bounds,
-                            float(config['DUST']['regen_rate']), float(config['DUST']['density']), str(config['DUST']['random_state'])))
+        # self.min_x, self.min_y, self.max_x, self.max_y
+        bounds = (float(config['DUST']['min_x']), float(config['DUST']['min_y']), float(config['DUST']['max_x']),
+                  float(config['DUST']['max_y']))
+        self.player = Player(self.map,
+                             DustMap(bounds, float(config['DUST']['regen_rate']), float(config['DUST']['density']),
+                                     str(config['DUST']['random_state'])))
 
         self.sensitivity = float(config['ANN']['speed_step'])
         self.do_draw_dust = config.getboolean('DUST', 'draw')
@@ -48,11 +54,14 @@ class Simulation:
     def run(self):
         is_running = True
         while is_running:
+            # if self.iter_counter == self.iterations:
+            #     is_running = False
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     is_running = False
 
-                if event.type == pygame.KEYDOWN and bool(int(config['PROGRAM']['manual_mode'])):
+                if event.type == pygame.KEYDOWN and config.getboolean('PROGRAM', 'manual_mode'):
                     try:
                         self.key_config[event.key]()
                     except KeyError:
@@ -64,27 +73,27 @@ class Simulation:
             self.player.step()
             self.player.calculate_sensor_distance()
 
-            if not bool(int(config['PROGRAM']['manual_mode'])):
-                ann = ANN(14, 2, [4])
-                self.ann_bridge(ann)
+            if not config.getboolean('PROGRAM', 'manual_mode'):
+                self.ann_bridge()
 
-            if bool(int(config['PROGRAM']['visualize_game'])):
+            if self.visualize_game:
                 self.draw()
-            # print(self.player.vel)
-            player_speeds = [math.sqrt(v[0]**2 + v[1]**2) for v in self.player.collision_velocities]
+
+            player_speeds = [math.sqrt(v[0] ** 2 + v[1] ** 2) for v in self.player.collision_velocities]
             mean, maxx = 0, 0
-            if len(player_speeds) > 0: 
+            if len(player_speeds) > 0:
                 mean = np.mean(player_speeds)
                 maxx = np.max(player_speeds)
-            print(self.player.points, "points, ",
-                  len(self.player.collision_velocities), "collisions, at",mean, "average speed, and",maxx, "max speed")
+            print(self.player.points, "points, ", len(self.player.collision_velocities), "collisions, at", mean,
+                  "average speed, and", maxx, "max speed")
             self.clock.tick(FPS)
+            self.iter_counter += 1
 
-    def ann_bridge(self, ann: ANN):
+    def ann_bridge(self):
         distances = np.array([dict_list[1] for dict_list in self.player.sensor_lines.values()], dtype=np.float64)
         velocities = np.array(self.player.vel, dtype=np.float64)
-        print(np.concatenate([distances, velocities]))
-        new_velocities = np.array(ann.forward(np.concatenate([distances, velocities])))
+
+        new_velocities = np.array(self.ann.forward(np.concatenate([distances, velocities])))
         self.player.vel = new_velocities * int(config['ANN']['max_speed'])
 
     def draw(self):
@@ -129,32 +138,28 @@ class Simulation:
         y_text = FONT.render(f'r:{round(self.player.vel[0] / self.sensitivity, 1)}', False, '#dddddd')
         self.win.blit(x_text, dest=[
             self.player.pos[0] - x_text.get_width() // 2 + (self.player.radius // 2) * np.sin(self.player.direction),
-            self.player.pos[1] - x_text.get_height() // 2 - (self.player.radius // 2) * np.cos(self.player.direction),
-        ])
-        self.win.blit(y_text, dest=[
-            (self.player.pos[0] - y_text.get_width() // 2 + (self.player.radius // 2)
-             * np.sin(np.pi + self.player.direction)),
-            (self.player.pos[1] - y_text.get_height() // 2 - (self.player.radius // 2)
-             * np.cos(np.pi + self.player.direction)),
-        ])
+            self.player.pos[1] - x_text.get_height() // 2 - (self.player.radius // 2) * np.cos(
+                self.player.direction), ])
+        self.win.blit(y_text, dest=[(self.player.pos[0] - y_text.get_width() // 2 + (self.player.radius // 2) * np.sin(
+            np.pi + self.player.direction)), (
+                    self.player.pos[1] - y_text.get_height() // 2 - (self.player.radius // 2) * np.cos(
+                np.pi + self.player.direction)), ])
 
         # Show Distance Numbers
         for i in range(self.player.num_sensors):
             distance = self.player.sensor_lines[i][1]
 
-            if not bool(int(config['PROGRAM']['sensor_data_separate'])):
+            if not config.getboolean('PROGRAM', 'sensor_data_separate'):
                 text = FONT.render(str(int(round(distance, 0))), False, '#dddddd')
             else:
                 text = FONT.render(str(i), False, '#dddddd')
 
-            self.win.blit(text, dest=[
-                (self.player.pos[0] - text.get_width() // 2 + (self.player.radius + 20)
-                 * np.cos(i * angle - self.player.direction)),
-                (self.player.pos[1] - text.get_height() // 2 - (self.player.radius + 20)
-                 * np.sin(i * angle - self.player.direction)),
-            ])
+            self.win.blit(text, dest=[(self.player.pos[0] - text.get_width() // 2 + (self.player.radius + 20) * np.cos(
+                i * angle - self.player.direction)), (
+                        self.player.pos[1] - text.get_height() // 2 - (self.player.radius + 20) * np.sin(
+                    i * angle - self.player.direction)), ])
 
-        if bool(int(config['PROGRAM']['sensor_data_separate'])):
+        if config.getboolean('PROGRAM', 'sensor_data_separate'):
             for i in range(self.player.num_sensors):
                 distance = self.player.sensor_lines[i][1]
                 text = FONT.render(f"Sensor {i}: {int(round(distance, 0))}", False, '#dddddd')
