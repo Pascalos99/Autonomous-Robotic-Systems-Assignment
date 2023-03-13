@@ -18,6 +18,7 @@ class Player:
         self.map = player_map
         self.dust = dust_map
         self.points = 0
+        self.collision_velocities = []
         self.pos = np.array([WIDTH / 2, HEIGHT / 2], dtype=np.float64)
         self.vel = [0, 0]
         self.radius = int(config['BOT']['radius'])
@@ -67,6 +68,8 @@ class Player:
             # Check if new position is inside a wall or has passed through a wall.
             collisions = self.position_intersects_wall(new_position)
             if len(collisions) > 0:
+                # Save collision speed
+                self.collision_velocities.append(np.array(self.vel))
                 # Save the intended new position.
                 intended_new_position = new_position
 

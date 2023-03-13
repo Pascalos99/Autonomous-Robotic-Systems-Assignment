@@ -3,6 +3,7 @@ import pathlib
 
 import numpy as np
 import pygame
+import math
 
 from player import Player
 from dust_map import DustMap
@@ -70,7 +71,13 @@ class Simulation:
             if bool(int(config['PROGRAM']['visualize_game'])):
                 self.draw()
             # print(self.player.vel)
-            print(self.player.points)
+            player_speeds = [math.sqrt(v[0]**2 + v[1]**2) for v in self.player.collision_velocities]
+            mean, maxx = 0, 0
+            if len(player_speeds) > 0: 
+                mean = np.mean(player_speeds)
+                maxx = np.max(player_speeds)
+            print(self.player.points, "points, ",
+                  len(self.player.collision_velocities), "collisions, at",mean, "average speed, and",maxx, "max speed")
             self.clock.tick(FPS)
 
     def ann_bridge(self, ann: ANN):
