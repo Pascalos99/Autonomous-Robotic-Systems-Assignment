@@ -1,9 +1,10 @@
 import configparser
+import math
 import pathlib
 from typing import Union
 
 import numpy as np
-import math
+
 from utils import normalize
 
 working_directory = pathlib.Path(__file__).parent.absolute()
@@ -34,7 +35,7 @@ class Player:
             sucked = self.dust.get_intersect(self.pos[0], self.pos[1], self.suck_radius)
             self.dust.remove_particles(sucked)
             if record_points: self.points += len(sucked)
-    
+
     def regenerate_dust(self):
         if self.dust.regen_rate > 0:
             self.dust.regenerate()
@@ -163,7 +164,7 @@ class Player:
         if len(x_positions) == 0:
             new_position = current_position
         return new_position
-    
+
     def better_line_collision(self, current_position, new_position, collisions):
         if len(collisions) > 1:
             return current_position
@@ -173,8 +174,8 @@ class Player:
         line = p2 - p1
         alpha = line.dot(line)
         beta = 2 * line.dot(p1 - pos)
-        gamma = p1.dot(p1) + pos.dot(pos) - 2 * p1.dot(pos) - r**2
-        D = beta**2 - 4 * alpha * gamma
+        gamma = p1.dot(p1) + pos.dot(pos) - 2 * p1.dot(pos) - r ** 2
+        D = beta ** 2 - 4 * alpha * gamma
         if D < 0:
             return new_position
         sqrtD = math.sqrt(D)
@@ -184,7 +185,7 @@ class Player:
             return new_position
         t = max(0, min(1, - beta / (2 * alpha)))
         intersect = p1 + t * line
-        return intersect - normalize(intersect - pos)*(r*1.00001)
+        return intersect - normalize(intersect - pos) * (r * 1.00001)
 
     def get_new_pose(self):
         if (self.ICC[0] == float('inf') or
@@ -218,7 +219,7 @@ class Player:
                         "right": np.array([self.pos + [self.radius, 0], position + [self.radius, 0]]),
                         "upper": np.array([self.pos + [0, self.radius], position + [0, self.radius]]),
                         "bottom": np.array([self.pos - [0, self.radius], position - [0, self.radius]])}
-        
+
         intersected_segments = []
 
         for line in self.map.wall_segments:
