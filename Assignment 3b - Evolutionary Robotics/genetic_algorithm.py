@@ -166,6 +166,8 @@ class GeneticAlgorithm:
                 print(f"Iteration { i + 1 }/{ num_iters }")
             # determine population fitness:
             self.fitness.sort_population(self.population, i == 0)
+            if display_iterations:
+                print(f"Concluded generation {i+1} with fitness [{round(self.population['fitness'][0], 2)}, {round(sum(self.population['fitness']) / self.popsize, 3)}]")
             if record_fitness: fitness_record.append(list(self.population['fitness']))
             if record_population: populat_record.append(dict(self.population))
             # create offspring:
@@ -185,6 +187,8 @@ class GeneticAlgorithm:
             self.iter += 1
 
         self.fitness.sort_population(self.population, False)
+        if display_iterations:
+            print(f"Concluded generation {i+1} with fitness [{round(self.population['fitness'][0], 2)}, {round(sum(self.population['fitness']) / self.popsize, 3)}]")
         if record_fitness: fitness_record.append(self.population['fitness'])
         if record_population: populat_record.append(self.population)
         if record_fitness and not record_population: return fitness_record
@@ -210,7 +214,7 @@ def tournament_selection(population, tournament_size=3):
     maximize = True
     if population["fitness"][0] < population["fitness"][-1]:
         maximize = False
-    
+
     population_size = len(population[list(population.keys())[0]])
     winners = { par: [] for par in population.keys() }
     for _ in range(population_size):
@@ -221,7 +225,7 @@ def tournament_selection(population, tournament_size=3):
             winner = { key: [values[i] for i in [tournament["fitness"].index(max(tournament["fitness"]))]] for key, values in tournament.items() }
         else:
             winner = { key: [values[i] for i in [tournament["fitness"].index(min(tournament["fitness"]))]] for key, values in tournament.items() }
-            
+
         for key in winner:
             winners[key].append(winner[key][0])
 
