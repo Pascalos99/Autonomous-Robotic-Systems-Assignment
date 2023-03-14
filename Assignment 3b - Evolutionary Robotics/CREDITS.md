@@ -1,6 +1,8 @@
 # Credits
 ### Anema, Pascal
-*
+* Genetic Algorithm
+* Dust Mechanism
+* ANN framework
 
 ### Bendler, Johannes
 * 
