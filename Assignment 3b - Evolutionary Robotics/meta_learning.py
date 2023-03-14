@@ -4,9 +4,9 @@ import pathlib
 from matplotlib import pyplot as plt
 
 from genetic_algorithm import Fitness
-from neural_GA import ANN, sigmoid, tanh, get_ANN_GA
-from simulation import default_ann_bridge, get_recurrent_ann_bridge, default_fitness_func
-from barebones_simulation import get_average_fitness
+from neural_GA import sigmoid, tanh
+from simulation import get_recurrent_ann_bridge, default_fitness_func
+from barebones_simulation import get_average_fitness, save_ann
 import genetic_algorithm as ga
 import neural_GA as nga
 import random
@@ -125,4 +125,48 @@ def meta_learning():
     plt.show()
 
 if __name__=='__main__':
-    meta_learning()
+    # call "meta_learning()" to perform meta learning
+    # 
+    # This code demonstrates the best GA found training on only map 14 (as shown in the video)
+    latent_size = 4
+    num_inputs, num_outputs = int(config['BOT']['num_sensors']) + latent_size, 2
+    hidden_layers = [latent_size]
+    activation_functions = [sigmoid, tanh]
+    ann_bridge = get_recurrent_ann_bridge(latent_size)
+    fitness = Fitness(get_average_fitness(
+        fitness_func=default_fitness_func,
+        ann_bridge=ann_bridge,
+        iterations_per_map=50,
+        maps_to_load = [training_maps[13]]
+    ))
+    anngeno = ga.Genotype(ann=nga.FixedTopologyANN(num_inputs, num_outputs, hidden_layers, activation_functions))
+
+    best_ind = {
+        'mu_init': -0.2830776544168997,
+        'sigma_init': 1.0432483973176976,
+        'avoid_asex': False,
+        'fitness_weighting': False,
+        'elite_sel': 0.08364619588821368,
+        'lucky_sel': 0,
+        'elite_sur': 0.37342341421309233,
+        'lucky_sur': 0.1490833913073438,
+        'mut_rate': 1.139472829225812,
+        'mut_chance': 1.0448141664655548,
+        'mut_sigma': 0.34608103565537884,
+        'fitness': 141.64079347122868} # after 4 iterations - popsize 20, sum of best_fitness + 0.7 2nd_best + 0.5 3rd_best
+    best_GA = get_GA_from_meta(best_ind, fitness, anngeno, popsize=20)
+    fitrecord = best_GA.iterate(40, display_iterations=True)
+    plt.plot([max(fit) for fit in fitrecord], label="max fitness")
+    plt.plot([sum(fit)/len(fit) for fit in fitrecord], label="mean fitness")
+    plt.xlabel("Generations")
+    plt.ylabel("($0.25 \cdot$ #dust) - #collisions - (max collision speed)$^2$")
+    plt.show()
+    
+    import pygame
+    from simulation import Simulation
+    for map_file in training_maps + testing_maps:
+        sim = Simulation(ann=best_GA.population['ann'][0], ann_bridge=ann_bridge, map_file=map_file, iterations=100)
+        sim.run()
+    pygame.quit()
+
+    save_ann(best_GA.population['ann'][0])
