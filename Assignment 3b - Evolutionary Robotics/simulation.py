@@ -250,6 +250,7 @@ def save_ann(ann: ANN):
     directory = f"{working_directory}/anns/{filename}"
     with open(directory, 'wb') as f:
         pickle.dump(ann, f)
+    print(f"Saved ANN successfully to {directory}")
 
 
 def load_ann(ann_file: str):
