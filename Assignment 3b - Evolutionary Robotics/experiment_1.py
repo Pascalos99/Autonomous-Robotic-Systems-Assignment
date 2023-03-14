@@ -35,7 +35,7 @@ def fitness_func(individual, simulation_iterations=100):
         
         # Calculate average over the test maps.
         fitness = fitness / len(train_maps)
-        # print("Avg. fitness:", fitness)
+        print("Avg. fitness:", fitness)
     
     return fitness
 
@@ -53,7 +53,7 @@ num_inputs, num_outputs = 12 + latent_size, 2
 hidden_layers = [latent_size]
 
 fitness = Fitness(fitness_func)
-GA = get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers, [sigmoid, tanh], 5)
+GA = get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers, [sigmoid, tanh], 20)
 
 GA.iterate(10, display_iterations=True)
 ANN_10 = GA.population["ann"][0]
@@ -61,7 +61,11 @@ ANN_10 = GA.population["ann"][0]
 GA.iterate(40, display_iterations=True)
 ANN = GA.population["ann"][0]
 
-with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "./ANNs/experiment_1.pkl"), "wb+") as file:
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "./ANNs/experiment_1A.pkl"), "wb+") as file:
+    pickle.dump(ANN_10, file)
+    print("Successfully saved ANN after 10 iterations.")
+
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "./ANNs/experiment_1B.pkl"), "wb+") as file:
     pickle.dump(ANN, file)
     print("Successfully saved best ANN.")
 
@@ -70,10 +74,10 @@ input("Press any key to continue to simulation.")
 
 print("After 10 generations")
 for train_map in [*get_train_maps(), *get_maps_from_directory("test")]:
-    simulation = Simulation(ann=ANN_10, ann_bridge=ann_bridge, map_file=train_map)
+    simulation = Simulation(ann=ANN_10, ann_bridge=ann_bridge, iterations=500, map_file=train_map)
     simulation.run()
     
 print("After 50 generations")
 for train_map in [*get_train_maps(), *get_maps_from_directory("test")]:
-    simulation = Simulation(ann=ANN, ann_bridge=ann_bridge, map_file=train_map)
+    simulation = Simulation(ann=ANN, ann_bridge=ann_bridge, iterations=500, map_file=train_map)
     simulation.run()

@@ -6,11 +6,11 @@ import time
 import numpy as np
 import pygame
 
+from ann_visualizer import ANN_Visualizer
 from dust_map import DustMap
 from genetic_algorithm import Fitness
 from map import Map
 from neural_GA import ANN, sigmoid, tanh, get_ANN_GA
-from ann_visualizer import ANN_Visualizer
 from player import Player
 
 pygame.init()
@@ -174,11 +174,11 @@ class Simulation:
             else:
                 text = FONT.render(str(i), False, '#dddddd')
 
-            self.win.blit(text, dest=[(self.player.pos[0] - text.get_width() // 2 + (self.player.radius + 20) * np.cos(
-                i * angle - self.player.direction)), (
-                                              self.player.pos[1] - text.get_height() // 2 - (
-                                              self.player.radius + 20) * np.sin(
-                                          i * angle - self.player.direction)), ])
+            self.win.blit(text, dest=[
+                (self.player.pos[0] - text.get_width() // 2 + (self.player.radius + 20) *
+                 np.cos(i * angle - self.player.direction)),
+                (self.player.pos[1] - text.get_height() // 2 - (self.player.radius + 20) *
+                 np.sin(i * angle - self.player.direction)), ])
 
         if config.getboolean('PROGRAM', 'sensor_data_separate'):
             for i in range(self.player.num_sensors):
@@ -187,8 +187,8 @@ class Simulation:
                 self.win.blit(text, dest=[self.win.get_width() - 150, 50 + i * 15])
 
     def draw_ann(self):
-        if not self.ann: return 
-        if not self.ann.network: return 
+        if not self.ann: return
+        if not self.ann.network: return
         if not self.ann.activations: return
 
         if not self.ANN_Viz:
@@ -207,13 +207,16 @@ class Simulation:
 def default_fitness_func(plr: Player):
     return plr.points * 0.25 - len(plr.collision_velocities) - max_velocity(plr) ** 2
 
+
 def alter_fitness_func(plr: Player):
     return plr.points - len(plr.collision_velocities) * max_velocity(plr)
+
 
 def default_ann_bridge(ann: ANN, dist, vel):
     # assumes input neurons of # of sensors + 2
     # assumes output neurons of 2
     return ann.forward(np.concatenate([dist, vel]))
+
 
 def get_recurrent_ann_bridge(latent_size: int = 4, latent_layer=-2):
     def recurrent_ann_bridge(ann: ANN, dist, vel):
@@ -223,14 +226,18 @@ def get_recurrent_ann_bridge(latent_size: int = 4, latent_layer=-2):
         latent = None
         if ann.activations is None:
             latent = np.zeros((latent_size,))
-        else: latent = ann.activations[latent_layer]
+        else:
+            latent = ann.activations[latent_layer]
         return ann.forward(np.concatenate([dist, latent]))
+
     return recurrent_ann_bridge
+
 
 def max_velocity(plr: Player):
     maxvel = 0
     if len(plr.collision_velocities) > 0: maxvel = np.max(plr.collision_velocities)
     return maxvel
+
 
 def get_basic_fitness(fitness_func=None, ann_bridge=None, iterations=100, visualize=False):
     if fitness_func is None:
@@ -241,6 +248,7 @@ def get_basic_fitness(fitness_func=None, ann_bridge=None, iterations=100, visual
         plr = sim.player
         sim.run()
         return fitness_func(plr)
+
     return basic_fitness
 
 
@@ -250,6 +258,7 @@ def save_ann(ann: ANN):
     directory = f"{working_directory}/anns/{filename}"
     with open(directory, 'wb') as f:
         pickle.dump(ann, f)
+    print(f"Saved ANN successfully to {directory}")
 
 
 def load_ann(ann_file: str):
@@ -267,13 +276,13 @@ if __name__ == '__main__':
         ann_bridge=get_recurrent_ann_bridge(latent_size, -2),
         iterations=100,
         visualize=True))
-    
+
     GA = get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers, activation_functions, popsize=5)
     GA.iterate(10)
-    sim = Simulation(ann=GA.population['ann'][0])
 
+    save_ann(GA.population['ann'][0])
+
+    sim = Simulation(ann=GA.population['ann'][0])
     # sim = Simulation()
     sim.run()
     pygame.quit()
-
-    save_ann(GA.population['ann'][0])

@@ -18,6 +18,7 @@ def tanh(x):
 def sigmoid_fitness_weighting(fitness1, fitness2):
     return sigmoid(fitness1 - fitness2)
 
+
 class ANN:
     def __init__(self, num_inputs, num_outputs, hidden_layers=[], activation_functions=sigmoid):
         self.num_inputs = num_inputs
@@ -72,9 +73,11 @@ class FixedTopologyANN(ga.Parameter):
 
         ga.Parameter.__init__(self, init, mutate, crossover)
 
+
 def get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers=[], activation_functions=sigmoid, popsize=50, init_mu=0,
-                   init_sigma=0.5, avoid_asex=True, tournament_size=3, elitist_survival=0.1, lucky_survival=0.1, master_mut_chance=1.,
-                   weight_mut_chance=1., mut_sigma=0.1, crossover_fit_weighting=lambda p1, p2: 0.5):
+               init_sigma=0.5, avoid_asex=True, tournament_size=3, elitist_survival=0.1, lucky_survival=0.1,
+               master_mut_chance=1.,
+               weight_mut_chance=1., mut_sigma=0.1, crossover_fit_weighting=lambda p1, p2: 0.5):
     # this implementation uses tournament selection and elitist survival
     """
     Parameters Explained: \n
@@ -109,10 +112,13 @@ def get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers=[], activation_fu
     GA.alter_mutation(master_mutation_rate=master_mut_chance, ann={'mut_chance': weight_mut_chance, 'sigma': mut_sigma})
     return GA
 
-def get_ANN_GA_simple(fitness, num_inputs, num_outputs, hidden_layers=[], activation_functions=sigmoid, popsize=50, init_mu=0,
-               init_sigma=0.5,
-               avoid_asex=True, keep_old_population=True, elitist_percent=0.4, lucky_chance=0.2, master_mut_chance=1.,
-               weight_mut_chance=1., mut_sigma=0.1, crossover_fit_weighting=lambda p1, p2: 0.5):
+
+def get_ANN_GA_simple(fitness, num_inputs, num_outputs, hidden_layers=[], activation_functions=sigmoid, popsize=50,
+                      init_mu=0,
+                      init_sigma=0.5,
+                      avoid_asex=True, keep_old_population=True, elitist_percent=0.4, lucky_chance=0.2,
+                      master_mut_chance=1.,
+                      weight_mut_chance=1., mut_sigma=0.1, crossover_fit_weighting=lambda p1, p2: 0.5):
     # this implementation uses elitist selection and binary survival
     """
     Parameters Explained: \n

@@ -16,8 +16,9 @@ from simulation import default_ann_bridge, get_recurrent_ann_bridge, default_fit
 working_directory = pathlib.Path(__file__).parent.absolute()
 config = configparser.ConfigParser()
 config.read(f"{working_directory}/config.ini")
-training_maps = [f"train/map_{i}.json" for i in range(1,19)]
-testing_maps = [f"map_{i}.json" for i in range(19,26)]
+training_maps = [f"train/map_{i}.json" for i in range(1, 19)]
+testing_maps = [f"map_{i}.json" for i in range(19, 26)]
+
 
 class MiniSim:
     def __init__(self, ann: ANN, ann_bridge: callable, map_to_load: str):
@@ -57,8 +58,9 @@ def get_average_fitness(fitness_func=None, ann_bridge=None, iterations_per_map=1
             plr = sim.player
             sim.run(iterations_per_map)
             fitness += fitness_func(plr)
-        print(f'   Evaluated at: {round(fitness / float(len(maps_to_load)),2)}')
+        print(f'   Evaluated at: {round(fitness / float(len(maps_to_load)), 2)}')
         return fitness / float(len(maps_to_load))
+
     return average_fitness
 
 
@@ -68,6 +70,7 @@ def save_ann(ann: ANN):
     directory = f"{working_directory}/anns/{filename}"
     with open(directory, 'wb') as f:
         pickle.dump(ann, f)
+    print(f"Saved ANN successfully to {directory}")
 
 
 def load_ann(ann_file: str):
@@ -85,7 +88,7 @@ if __name__ == '__main__':
         fitness_func=default_fitness_func,
         ann_bridge=ann_bridge,
         iterations_per_map=100,
-        maps_to_load = training_maps
+        maps_to_load=training_maps
     ))
     GA = get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers, activation_functions, popsize=50)
     fitness = GA.iterate(20)
@@ -94,6 +97,7 @@ if __name__ == '__main__':
 
     import pygame
     from simulation import Simulation
+
     for map_file in training_maps + testing_maps:
         sim = Simulation(ann=GA.population['ann'][0], ann_bridge=ann_bridge, map_file=map_file, iterations=100)
         sim.run()
