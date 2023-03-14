@@ -157,12 +157,13 @@ class GeneticAlgorithm:
         # kwargs are fed directly into the pairing method defined at initialization
         self.pairingpars = pairing_kwargs
 
-    def iterate(self, num_iters, record_fitness=True, record_population=False):
+    def iterate(self, num_iters, record_fitness=True, record_population=False, display_iterations=False):
         fitness_record = []
         populat_record = []
 
         for i in range(num_iters):
-            print(f"Starting generation #{i+1} out of {num_iters}...")
+            if display_iterations:
+                print(f"Iteration { i + 1 }/{ num_iters }")
             # determine population fitness:
             self.fitness.sort_population(self.population, i == 0)
             print(f"Concluded generation {i+1} with fitness [{round(self.population['fitness'][0], 2)}, {round(sum(self.population['fitness']) / self.popsize, 3)}]")
@@ -211,7 +212,7 @@ def tournament_selection(population, tournament_size=3):
     maximize = True
     if population["fitness"][0] < population["fitness"][-1]:
         maximize = False
-    
+
     population_size = len(population[list(population.keys())[0]])
     winners = { par: [] for par in population.keys() }
     for _ in range(population_size):
@@ -222,7 +223,7 @@ def tournament_selection(population, tournament_size=3):
             winner = { key: [values[i] for i in [tournament["fitness"].index(max(tournament["fitness"]))]] for key, values in tournament.items() }
         else:
             winner = { key: [values[i] for i in [tournament["fitness"].index(min(tournament["fitness"]))]] for key, values in tournament.items() }
-            
+
         for key in winner:
             winners[key].append(winner[key][0])
 
