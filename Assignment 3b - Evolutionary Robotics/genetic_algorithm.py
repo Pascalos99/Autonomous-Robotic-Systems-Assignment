@@ -162,8 +162,10 @@ class GeneticAlgorithm:
         populat_record = []
 
         for i in range(num_iters):
+            print(f"Starting generation #{i+1} out of {num_iters}...")
             # determine population fitness:
             self.fitness.sort_population(self.population, i == 0)
+            print(f"Concluded generation {i+1} with fitness [{round(self.population['fitness'][0], 2)}, {round(sum(self.population['fitness']) / self.popsize, 3)}]")
             if record_fitness: fitness_record.append(list(self.population['fitness']))
             if record_population: populat_record.append(dict(self.population))
             # create offspring:
@@ -183,6 +185,7 @@ class GeneticAlgorithm:
             self.iter += 1
 
         self.fitness.sort_population(self.population, False)
+        print(f"Concluded generation {i+1} with fitness [{round(self.population['fitness'][0], 2)}, {round(sum(self.population['fitness']) / self.popsize, 3)}]")
         if record_fitness: fitness_record.append(self.population['fitness'])
         if record_population: populat_record.append(self.population)
         if record_fitness and not record_population: return fitness_record

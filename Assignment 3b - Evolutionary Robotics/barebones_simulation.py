@@ -4,6 +4,7 @@ import pickle
 import time
 
 import numpy as np
+from matplotlib import pyplot as plt
 
 from dust_map import DustMap
 from genetic_algorithm import Fitness
@@ -16,6 +17,7 @@ working_directory = pathlib.Path(__file__).parent.absolute()
 config = configparser.ConfigParser()
 config.read(f"{working_directory}/config.ini")
 training_maps = [f"train/map_{i}.json" for i in range(1,19)]
+testing_maps = [f"map_{i}.json" for i in range(19,26)]
 
 class MiniSim:
     def __init__(self, ann: ANN, ann_bridge: callable, map_to_load: str):
@@ -49,15 +51,13 @@ def get_average_fitness(fitness_func=None, ann_bridge=None, iterations_per_map=1
         maps_to_load = training_maps
 
     def average_fitness(individual):
-        print("Evaluating individual:")
         fitness = 0
         for i in range(len(maps_to_load)):
-            print(f'-- starting simulator on map "{maps_to_load[i]}"...')
             sim = MiniSim(individual['ann'], ann_bridge, maps_to_load[i])
             plr = sim.player
             sim.run(iterations_per_map)
             fitness += fitness_func(plr)
-            print(f'-- total fitness of individual updated to {round(fitness/(i+1),2)}')
+        print(f'   Evaluated at: {round(fitness / float(len(maps_to_load)),2)}')
         return fitness / float(len(maps_to_load))
     return average_fitness
 
@@ -85,15 +85,18 @@ if __name__ == '__main__':
         fitness_func=default_fitness_func,
         ann_bridge=ann_bridge,
         iterations_per_map=100,
-        maps_to_load = training_maps[:3]
+        maps_to_load = training_maps
     ))
-    GA = get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers, activation_functions, popsize=25)
-    GA.iterate(2)
+    GA = get_ANN_GA(fitness, num_inputs, num_outputs, hidden_layers, activation_functions, popsize=50)
+    fitness = GA.iterate(20)
+    plt.plot(fitness)
+    plt.show()
 
     import pygame
     from simulation import Simulation
-    sim = Simulation(ann=GA.population['ann'][0], ann_bridge=ann_bridge)
-    sim.run()
+    for map_file in training_maps + testing_maps:
+        sim = Simulation(ann=GA.population['ann'][0], ann_bridge=ann_bridge, map_file=map_file, iterations=100)
+        sim.run()
     pygame.quit()
 
     save_ann(GA.population['ann'][0])
