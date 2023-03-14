@@ -8,7 +8,8 @@
 * 
 
 ### Cortenraede, Cédric
-* 
+* Fitness functions
+* Selection method
 
 ### Körver, Bas
 * Robot IO
