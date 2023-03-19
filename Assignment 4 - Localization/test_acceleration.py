@@ -6,7 +6,7 @@ WIDTH, HEIGHT = 800, 600
 FPS = 60
 DT = 0.05
 H = 0.001
-DV = 3
+DA = 0.3
 DW = 0.15
 
 class DotDisplay:
@@ -16,6 +16,7 @@ class DotDisplay:
         self.y = y
         self.theta = 0.
         self.v = 0.
+        self.a = 0.
         self.w = 0.
         self.size = size
         self.color = (0, 0, 255)
@@ -24,17 +25,18 @@ class DotDisplay:
         self.clock = pygame.time.Clock()
 
         self.key_config = {
-            pygame.K_w: lambda: self.setVW(self.v + DV, self.w),
-            pygame.K_s: lambda: self.setVW(self.v - DV, self.w),
-            pygame.K_a: lambda: self.setVW(self.v, self.w - DW),
-            pygame.K_d: lambda: self.setVW(self.v, self.w + DW),
-            pygame.K_x: lambda: self.setVW(0, 0), 
+            pygame.K_w: lambda: self.setAVW(self.a + DA, self.v, self.w),
+            pygame.K_s: lambda: self.setAVW(self.a - DA, self.v, self.w),
+            pygame.K_a: lambda: self.setAVW(self.a, self.v, self.w - DW),
+            pygame.K_d: lambda: self.setAVW(self.a, self.v, self.w + DW),
+            pygame.K_x: lambda: self.setAVW(0, 0, 0),
+            pygame.K_z: lambda: self.setAVW(0,self.v,self.w),
             pygame.K_r: lambda: self.setXY(*self.xy_init)
         }
     
-    def setVW(self, v2, w2):
-        self.v, self.w = v2, w2
-    
+    def setAVW(self, a2, v2, w2):
+        self.a, self.v, self.w = a2, v2, w2
+
     def setXY(self, x2, y2):
         self.x, self.y = x2, y2
 
@@ -48,13 +50,16 @@ class DotDisplay:
 
     def step(self):
         if abs(self.w) > H:
-            self.x = self.x + self.v * (sin(self.theta + self.w * DT) - sin(self.theta)) / self.w
-            self.y = self.y - self.v * (cos(self.theta + self.w * DT) - cos(self.theta)) / self.w
+            self.x = self.x + self.a * (cos(self.theta + self.w * DT) - cos(self.theta)) / (self.w**2)
+            self.x += ((self.a * DT + self.v) * sin(self.theta + self.w * DT) - self.v * sin(self.theta)) / self.w
+            self.y = self.y + self.a * (sin(self.theta + self.w * DT) - sin(self.theta)) / (self.w**2)
+            self.y -= ((self.a * DT + self.v) * cos(self.theta + self.w * DT) - self.v * cos(self.theta)) / self.w
         else:
-            self.x = self.x + self.v * cos(self.theta) * DT
-            self.y = self.y + self.v * sin(self.theta) * DT
+            self.x = self.x + 0.5 * DT * (self.a * DT + 2.*self.v) * cos(self.theta)
+            self.y = self.y + 0.5 * DT * (self.a * DT + 2.*self.v) * sin(self.theta)
 
         self.theta = self.theta + self.w * DT
+        self.v = self.v + self.a * DT
         
     
     def run(self):
