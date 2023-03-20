@@ -1,5 +1,6 @@
 import pygame
 from math import sin, cos, pi
+import random
 
 BG_COLOR = pygame.Color(200,210,210)
 WIDTH, HEIGHT = 800, 600
@@ -8,6 +9,7 @@ DT = 0.05
 H = 0.001
 DV = 3
 DW = 0.15
+history = 2000
 
 class DotDisplay:
     def __init__(self, x, y, size):
@@ -17,6 +19,8 @@ class DotDisplay:
         self.theta = 0.
         self.v = 0.
         self.w = 0.
+        self.Htrue = [(x, y, 0)]
+        self.Hpred = [(x, y, 0)]
         self.size = size
         self.color = (0, 0, 255)
         self.thickness = 1
@@ -29,7 +33,8 @@ class DotDisplay:
             pygame.K_a: lambda: self.setVW(self.v, self.w - DW),
             pygame.K_d: lambda: self.setVW(self.v, self.w + DW),
             pygame.K_x: lambda: self.setVW(0, 0), 
-            pygame.K_r: lambda: self.setXY(*self.xy_init)
+            pygame.K_r: lambda: self.setXY(*self.xy_init),
+            pygame.K_c: lambda: self.resetHistory()
         }
     
     def setVW(self, v2, w2):
@@ -37,25 +42,42 @@ class DotDisplay:
     
     def setXY(self, x2, y2):
         self.x, self.y = x2, y2
+    
+    def resetHistory(self):
+        self.Htrue, self.Hpred = [(self.x, self.y, self.theta)], [(self.x, self.y, self.theta)]
 
     def draw(self):
         self.win.fill(BG_COLOR)
         pygame.draw.circle(self.win, self.color, (self.x, self.y), self.size, self.thickness)
-        pygame.draw.line(self.win, '#000000', (self.x, self.y), (
+        pygame.draw.line(self.win, '#ff0000', (self.x, self.y), (
             self.x + self.size * sin(self.theta + 0.5 * pi),
             self.y - self.size * cos(self.theta + 0.5 * pi),), width=2)
+        for i in range(len(self.Htrue)-1)[-history:]:
+            h1, h2 = self.Htrue[i][:2], self.Htrue[i+1][:2]
+            p1, p2 = self.Hpred[i][:2], self.Hpred[i+1][:2]
+            pygame.draw.line(self.win, '#00aa00', p1, p2)
+            pygame.draw.line(self.win, '#000000', h1, h2)
+            
         pygame.display.flip()
 
-    def step(self):
-        if abs(self.w) > H:
-            self.x = self.x + self.v * (sin(self.theta + self.w * DT) - sin(self.theta)) / self.w
-            self.y = self.y - self.v * (cos(self.theta + self.w * DT) - cos(self.theta)) / self.w
+    def next_state(self, state, v, w):
+        x, y, theta = state
+        if abs(w) > H:
+            x = x + v * (sin(theta + w * DT) - sin(theta)) / w
+            y = y - v * (cos(theta + w * DT) - cos(theta)) / w
         else:
-            self.x = self.x + self.v * cos(self.theta) * DT
-            self.y = self.y + self.v * sin(self.theta) * DT
+            x = x + v * cos(theta) * DT
+            y = y + v * sin(theta) * DT
+        theta = theta + w * DT
+        return x, y, theta
 
-        self.theta = self.theta + self.w * DT
-        
+    def step(self):
+        state = (self.x, self.y, self.theta)
+        self.x, self.y, self.theta = self.next_state(state, self.v, self.w)
+    
+    def pred(self):
+        # this is to 'simulate' what it might look like if we have an actual Karman filter with noise implemented
+        return self.next_state(self.Hpred[-1], self.v * random.normalvariate(1, 0.5), self.w * random.normalvariate(1, 0.5))
     
     def run(self):
         is_running = True
@@ -77,6 +99,8 @@ class DotDisplay:
                     self.win = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
 
             self.step()
+            self.Htrue.append((self.x, self.y, self.theta))
+            self.Hpred.append(self.pred())
             self.draw()
             self.clock.tick(FPS)
 
