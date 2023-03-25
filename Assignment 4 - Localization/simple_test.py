@@ -1,5 +1,6 @@
 import pygame
 from math import sin, cos, pi
+import numpy as np
 import random
 
 BG_COLOR = pygame.Color(200,210,210)
@@ -10,6 +11,38 @@ H = 0.001
 DV = 3
 DW = 0.15
 history = 2000
+
+class Map:
+    def __init__(self, type='sunflower'):
+        self.num_landmarks = 10
+        self.landmarks = []
+        
+        if type == 'random':
+            self.init_random_landmarks()
+        elif type == 'sunflower':
+            self.init_sunflower_landmarks()
+        
+    def init_random_landmarks(self):
+        for _ in range(self.num_landmarks):
+            self.landmarks.append([
+                random.uniform(0, WIDTH),
+                random.uniform(0, HEIGHT)
+            ])
+        
+    def init_sunflower_landmarks(self):
+        indices = np.arange(0, self.num_landmarks, dtype=float) + 0.5
+        rs = np.sqrt(indices/self.num_landmarks)
+        thetas = np.pi * (1 + 5**0.5) * indices
+
+        for r, theta in zip(rs, thetas):
+            self.landmarks.append([
+                r * np.cos(theta) * WIDTH // 2 + WIDTH // 2, 
+                r * np.sin(theta) * HEIGHT // 2 + HEIGHT // 2,
+            ])
+        print(self.landmarks)
+            
+    def get_landmark_positions(self):
+        return self.landmarks
 
 class DotDisplay:
     def __init__(self, x, y, size):
@@ -26,6 +59,8 @@ class DotDisplay:
         self.thickness = 1
         self.win = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
+        
+        self.map = Map(type='sunflower')
 
         self.key_config = {
             pygame.K_w: lambda: self.setVW(self.v + DV, self.w),
@@ -48,7 +83,13 @@ class DotDisplay:
 
     def draw(self):
         self.win.fill(BG_COLOR)
-        pygame.draw.circle(self.win, self.color, (self.x, self.y), self.size, self.thickness)
+        self.draw_landmarks()
+        self.draw_player()
+        pygame.display.flip()
+        
+    def draw_player(self):
+        pygame.draw.circle(self.win, self.color,
+                           (self.x, self.y), self.size, self.thickness)
         pygame.draw.line(self.win, '#ff0000', (self.x, self.y), (
             self.x + self.size * sin(self.theta + 0.5 * pi),
             self.y - self.size * cos(self.theta + 0.5 * pi),), width=2)
@@ -58,7 +99,10 @@ class DotDisplay:
             pygame.draw.line(self.win, '#00aa00', p1, p2)
             pygame.draw.line(self.win, '#000000', h1, h2)
             
-        pygame.display.flip()
+    def draw_landmarks(self):
+        landmarks_pos = self.map.get_landmark_positions()
+        for l_pos in landmarks_pos:
+            pygame.draw.circle(self. win, '#1234aa', l_pos, 3, 3)
 
     def next_state(self, state, v, w):
         x, y, theta = state
