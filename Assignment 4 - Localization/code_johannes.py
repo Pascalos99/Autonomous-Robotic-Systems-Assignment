@@ -225,7 +225,7 @@ class Simulation:
         predicted_y = self.history_pred[-1][1]
         predicted_theta = self.history_pred[-1][2]
             
-        z_t = (np.array([predicted_x, predicted_y, predicted_theta]) + np.array([0.01, 0.01, 0.01])).T
+        z_t = (np.array([predicted_x, predicted_y, predicted_theta]) + np.array([random.normalvariate(0, 1), random.normalvariate(0, 1), random.normalvariate(0, 1)])).T
         
         print("Predicted current location using landmarks:\n", z_t)
         print("Actual current location:\n", np.array([self.x, self.y, self.theta]), "\n")
@@ -243,9 +243,9 @@ class Simulation:
         Sigma_t = self.covariance
         C_t = np.identity(3)
         Q_t = np.array([
-            [0.01, 0.0, 0.0],
-            [0.0, 0.01, 0.0],
-            [0.0, 0.0, 0.01],
+            [random.normalvariate(0, 1), 0.0, 0.0],
+            [0.0, random.normalvariate(0, 1), 0.0],
+            [0.0, 0.0, random.normalvariate(0, 1)],
         ])
         
         K_t = Sigma_t @ C_t.T @ np.linalg.inv(C_t @ Sigma_t @ C_t.T + Q_t)
