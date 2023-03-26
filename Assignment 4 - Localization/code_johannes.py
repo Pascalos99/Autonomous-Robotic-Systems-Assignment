@@ -206,17 +206,77 @@ class Simulation:
         return new_pose
 
 
-
     def correct(self):
+        # If there are no landmarks we cannot apply the correction step.
+        if len(self.landmarks_in_view) <= 0:
+            return self.history_pred[-1]
+        
         # If enough landmarks are present, the current location can easily be triangulated
         if len(self.landmarks_in_view) >= 3:
             return self.triangulate_position()
         
-        # Here should be some corrections steps
-        # TODO I am too confused to do anything.... Sorry :(
+        # Locate current position of robot using landmarks.
+        landmarks = np.array(self.landmarks_in_view)
+        distances = np.array([landmarks[:, 0] - self.x, landmarks[:, 1] - self.y])
+        bearings = np.array([np.arctan2(landmarks[:, 1] - self.y, landmarks[:, 0] - self.x) - self.theta])
+        
+        # TODO: Locate current location from landmarks.
+        predicted_x = self.history_pred[-1][0]
+        predicted_y = self.history_pred[-1][1]
+        predicted_theta = self.history_pred[-1][2]
+            
+        z_t = (np.array([predicted_x, predicted_y, predicted_theta]) + np.array([0.01, 0.01, 0.01])).T
+        
+        print("Predicted current location using landmarks:\n", z_t)
+        print("Actual current location:\n", np.array([self.x, self.y, self.theta]), "\n")
+            
+        """
+        CORRECTION STEP 1
+        Formula: K_t = Sigma_t * (C_t)^T * (C_t * Sigma_t * (C_t)^T + Q_t)^-1
+        
+            Sigma_t = Coveriance matrix at interval t.
+            C_t = Identity matrix.
+            (C_t)^T = Transposed identity matrix so just identity matrix.
+            Q_t = Noise
+        """
+        
+        Sigma_t = self.covariance
+        C_t = np.identity(3)
+        Q_t = np.array([
+            [0.01, 0.0, 0.0],
+            [0.0, 0.01, 0.0],
+            [0.0, 0.0, 0.01],
+        ])
+        
+        K_t = Sigma_t @ C_t.T @ np.linalg.inv(C_t @ Sigma_t @ C_t.T + Q_t)
+        
+        """
+        CORRECTION STEP 2
+        Formula: µ_t = µ_t + K_t * (z_t - C_t * µ_t)
+        
+            µ_t = Predicted pose for time t.
+            K_t = Calculated in previous step.
+            z_t = Predicted current state at time t.
+            C_t = Identity matrix
+        """
+        
+        mu_t = self.history_pred[-1]
+        
+        mu_t = mu_t + K_t @ (z_t - C_t @ mu_t)
+        
+        """
+        CORRECTION STEP 3
+        Formula: Sigma_t = (I - K_t * C_t) * Sigma_t
+        
+            I = Identity matrix.
+            K_t = Calculated step 1.
+            C_t = Identity matrix.
+            Sigma_t = Covariance matrix at interval t.
+        """
+        
+        self.covariance = (np.identity(3) - K_t @ C_t) @ self.covariance
 
-        return self.history_pred[-1]
-
+        return mu_t
 
 
     def triangulate_position(self):
