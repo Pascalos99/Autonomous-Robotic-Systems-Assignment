@@ -213,9 +213,8 @@ class Simulation:
         return new_pose
 
     def correct(self):
-        # If there are no landmarks we cannot apply the correction step.
-        # TODO: Change landmarks needed when location can be decided for less than 3 landmarks.
-        if len(self.landmarks_in_view) <= 2:
+        # If there are too few landmarks we cannot apply the correction step.
+        if len(self.landmarks_in_view) <= 1:
             return self.history_pred[-1]
 
         # Locate current position of robot using landmarks.
@@ -231,42 +230,34 @@ class Simulation:
                                                         self.landmarks_in_view[2], distances[0],
                                                         distances[1], distances[2])
 
-        # elif len(self.landmarks_in_view) == 2:
-        #     heading = self.theta * 180 / np.pi
-        #     theta1 = np.arctan2(self.landmarks_in_view[0][1], self.landmarks_in_view[0][0])
-        #     theta2 = np.arctan2(np.sin(heading), np.cos(heading))
-        #     sensor_angle_measured = theta2 - theta1
-        #
-        #     intersections = self.get_circle_intersection(self.landmarks_in_view[0], distances[0], self.landmarks_in_view[1], distances[1])
-        #     theta2 = np.arctan2(intersections[0][1], intersections[0][0])
-        #     sensor_angle_1 = theta2 - theta1
-        #
-        #     theta2 = np.arctan2(intersections[1][1], intersections[1][0])
-        #     sensor_angle_2 = theta2 - theta1
-        #
-        #     print(sensor_angle_measured)
-        #     print(sensor_angle_1, sensor_angle_2)
-            print()
+        elif len(self.landmarks_in_view) == 2:
+            intersections = self.get_circle_intersection(self.landmarks_in_view[0], distances[0],
+                                                         self.landmarks_in_view[1], distances[1])
 
+            error = np.inf
+            correct_intersection = None
+            for intersection in intersections:
+                [bearings_intersection] = np.array([np.arctan2(self.landmarks_in_view[:, 1] - intersection[1],
+                                 self.landmarks_in_view[:, 0] - intersection[0]) - self.theta])
+                
+                intersection_error = 0
+                for i, bearing in np.ndenumerate(bearings_intersection):
+                    intersection_error += (bearing - bearings[i])**2
 
+                if error > intersection_error:
+                    error = intersection_error
+                    correct_intersection = intersection
 
-        else:
-            # TODO: Locate current location from landmarks when less than 3.
-            predicted_x = self.history_pred[-1][0]
-            predicted_y = self.history_pred[-1][1]
+            predicted_x, predicted_y = correct_intersection
             
         # Predict orientation (theta) of robot using first landmark.
         relative_position = self.landmarks_in_view[0] - [predicted_x, predicted_y]
         predicted_theta = np.arctan2(relative_position[1], relative_position[0]) - bearings[0]
             
-        # TODO: Add noise
         z_t = (
             np.array([predicted_x, predicted_y, predicted_theta])
             + np.array([random.normalvariate(0, 0.05), random.normalvariate(0, 0.05), random.normalvariate(0, 0.05)])
         ).T
-
-        print("Predicted current location using landmarks:\n", z_t)
-        print("Actual current location:\n", np.array([self.x, self.y, self.theta]), "\n")
 
         """
         CORRECTION STEP 1
