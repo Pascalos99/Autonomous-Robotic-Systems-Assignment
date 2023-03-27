@@ -253,14 +253,15 @@ class Simulation:
             # TODO: Locate current location from landmarks when less than 3.
             predicted_x = self.history_pred[-1][0]
             predicted_y = self.history_pred[-1][1]
-
-        # TODO: Predict orientation (theta) of robot using first landmark.
-        predicted_theta = self.history_pred[-1][2]
-
+            
+        # Predict orientation (theta) of robot using first landmark.
+        relative_position = landmarks[0] - [self.x, self.y]
+        predicted_theta = np.arctan2(relative_position[1], relative_position[0]) - bearings[0]
+            
         # TODO: Add noise
         z_t = (
             np.array([predicted_x, predicted_y, predicted_theta])
-            #    + np.array([random.normalvariate(0, 1), random.normalvariate(0, 1), random.normalvariate(0, 1)])
+            + np.array([random.normalvariate(0, 0.05), random.normalvariate(0, 0.05), random.normalvariate(0, 0.05)])
         ).T
 
         print("Predicted current location using landmarks:\n", z_t)
@@ -279,9 +280,9 @@ class Simulation:
         Sigma_t = self.covariance
         C_t = np.identity(3)
         Q_t = np.array([
-            [random.normalvariate(0, 1), 0.0, 0.0],
-            [0.0, random.normalvariate(0, 1), 0.0],
-            [0.0, 0.0, random.normalvariate(0, 1)],
+            [random.normalvariate(0, .01), 0.0, 0.0],
+            [0.0, random.normalvariate(0, .01), 0.0],
+            [0.0, 0.0, random.normalvariate(0, .01)],
         ])
 
         K_t = Sigma_t @ C_t.T @ np.linalg.inv(C_t @ Sigma_t @ C_t.T + Q_t)
