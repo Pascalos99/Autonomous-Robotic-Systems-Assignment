@@ -229,7 +229,7 @@ class Simulation:
             
         # Predict orientation (theta) of robot using first landmark.
         # TODO:
-        predicted_theta = self.history_pred[-1]
+        predicted_theta = self.history_pred[-1][2]
             
         z_t = (np.array([predicted_x, predicted_y, predicted_theta]) + np.array([random.normalvariate(0, 1), random.normalvariate(0, 1), random.normalvariate(0, 1)])).T
         
