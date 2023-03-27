@@ -1,52 +1,55 @@
-import pygame
-import numpy as np
-from scipy.optimize import least_squares, minimize
 import random
+
+import numpy as np
+import pygame
+from scipy.optimize import minimize
 
 # BG_COLOR = pygame.Color(200,210,210)
 BG_COLOR = '#ffffff'
 WIDTH, HEIGHT = 800, 600
 FPS = 60
-DT = 0.05   # Delta T (time)
-H = 0.001   # ?
-DV = 3      # Delta V (velocity)
-DW = 0.15   # Delta W (angular velocity)
+DT = 0.05  # Delta T (time)
+H = 0.001  # ?
+DV = 3  # Delta V (velocity)
+DW = 0.15  # Delta W (angular velocity)
 
-VIEW_DIST = 100 # threshold for seeing landmarks
+VIEW_DIST = 100  # threshold for seeing landmarks
 history = 2000  # number of history points
+
 
 class Map:
     def __init__(self, type='sunflower'):
         self.num_landmarks = 25
         self.landmarks = []
-        
+
         if type == 'random':
             self.init_random_landmarks()
         elif type == 'sunflower':
             self.init_sunflower_landmarks()
-        
+
     def init_random_landmarks(self):
         for _ in range(self.num_landmarks):
             self.landmarks.append([
                 random.uniform(0, WIDTH),
                 random.uniform(0, HEIGHT)
             ])
-        
+
     # Thank you: https://stackoverflow.com/questions/9600801/evenly-distributing-n-points-on-a-sphere 
     # This places all landmarks inside of a circle with same distance to each other
     def init_sunflower_landmarks(self):
         indices = np.arange(0, self.num_landmarks, dtype=float) + 0.5
-        rs = np.sqrt(indices/self.num_landmarks)
-        thetas = np.pi * (1 + 5**0.5) * indices
+        rs = np.sqrt(indices / self.num_landmarks)
+        thetas = np.pi * (1 + 5 ** 0.5) * indices
 
         for r, theta in zip(rs, thetas):
             self.landmarks.append([
-                r * np.cos(theta) * WIDTH // 2 + WIDTH // 2, 
+                r * np.cos(theta) * WIDTH // 2 + WIDTH // 2,
                 r * np.sin(theta) * HEIGHT // 2 + HEIGHT // 2,
             ])
-            
+
     def get_landmark_positions(self):
         return self.landmarks
+
 
 class Simulation:
     def __init__(self, x, y):
@@ -62,35 +65,35 @@ class Simulation:
         self.covariance = np.array([[0.0001, 0.0, 0.0],
                                     [0.0, 0.0001, 0.0],
                                     [0.0, 0.0, 0.0001]])
-        
+
         self.history_true = [(x, y, 0)]
         self.history_pred = [(x, y, 0)]
         self.history_corr = [(x, y, 0)]
         self.history_covariance = []
-        
+
         self.size = 30
         self.win = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
         self.clock = pygame.time.Clock()
 
         self.map = Map(type='sunflower')
-        self.landmarks_in_view = []
+        self.landmarks_in_view = np.array([])
 
         self.key_config = {
             pygame.K_w: lambda: self.setVW(self.v + DV, self.w),
             pygame.K_s: lambda: self.setVW(self.v - DV, self.w),
             pygame.K_a: lambda: self.setVW(self.v, self.w - DW),
             pygame.K_d: lambda: self.setVW(self.v, self.w + DW),
-            pygame.K_x: lambda: self.setVW(0, 0), 
+            pygame.K_x: lambda: self.setVW(0, 0),
             pygame.K_r: lambda: self.setXY(*self.xy_init),
             pygame.K_c: lambda: self.resetHistory()
         }
-    
+
     def setVW(self, vel, ang_vel):
         self.v, self.w = vel, ang_vel
-    
+
     def setXY(self, x, y):
         self.x, self.y = x, y
-    
+
     def resetHistory(self):
         self.history_true = [(self.x, self.y, self.theta)]
         self.history_pred = [(self.x, self.y, self.theta)]
@@ -100,26 +103,26 @@ class Simulation:
         self.draw_landmarks()
         self.draw_player()
         self.draw_covariance()
-        
+
     def draw_player(self):
         pygame.draw.circle(self.win, '#0000ff', (self.x, self.y), self.size, 1)
         pygame.draw.line(self.win, '#ff0000', (self.x, self.y), (
-                self.x + self.size * np.sin(self.theta + 0.5 * np.pi),
-                self.y - self.size * np.cos(self.theta + 0.5 * np.pi),
-            ), 
-            width=2)
-        
+            self.x + self.size * np.sin(self.theta + 0.5 * np.pi),
+            self.y - self.size * np.cos(self.theta + 0.5 * np.pi),
+        ),
+                         width=2)
+
         for i in range(len(self.history_true) - 1)[-history:]:
-            true_pos_1, true_pos_2 = self.history_true[i][:2], self.history_true[i+1][:2]
-            pred_pos_1, pred_pos_2 = self.history_pred[i][:2], self.history_pred[i+1][:2]
+            true_pos_1, true_pos_2 = self.history_true[i][:2], self.history_true[i + 1][:2]
+            pred_pos_1, pred_pos_2 = self.history_pred[i][:2], self.history_pred[i + 1][:2]
             pygame.draw.line(self.win, '#000000', true_pos_1, true_pos_2, width=2)
             if i % 10 > 5:
                 pygame.draw.line(self.win, '#000000', pred_pos_1, pred_pos_2, width=2)
-            
+
     def draw_landmarks(self):
         landmarks_pos = self.map.get_landmark_positions()
         for l_pos in landmarks_pos:
-            pygame.draw.circle(self. win, '#000000', l_pos, 3, 3)
+            pygame.draw.circle(self.win, '#000000', l_pos, 3, 3)
         for l_pos in self.landmarks_in_view:
             pygame.draw.line(self.win, '#00bb00', l_pos, (self.x, self.y), width=2)
 
@@ -127,10 +130,10 @@ class Simulation:
         for cov in self.history_covariance:
             # TODO rotation
             pygame.draw.ellipse(
-                surface = self.win,
-                color = '#000000',
-                rect = np.abs(cov),
-                width = 1,
+                surface=self.win,
+                color='#000000',
+                rect=np.abs(cov),
+                width=1,
             )
 
     def next_state(self, state, v, w):
@@ -145,12 +148,17 @@ class Simulation:
         self.x, self.y, self.theta = self.next_state(state, self.v, self.w)
 
         # Collect landmarks that are in view distance
-        landmarks_pos = self.map.get_landmark_positions()
-        self.landmarks_in_view = []
-        for l_pos in landmarks_pos:
-            if np.sqrt((l_pos[0] - self.x)**2 + (l_pos[1] - self.y)**2) < VIEW_DIST:
-                self.landmarks_in_view.append(l_pos)
-    
+        # landmarks_pos = self.map.get_landmark_positions()
+        # self.landmarks_in_view = []
+        # for l_pos in landmarks_pos:
+        #     if np.sqrt((l_pos[0] - self.x) ** 2 + (l_pos[1] - self.y) ** 2) < VIEW_DIST:
+        #         self.landmarks_in_view.append(l_pos)
+
+        # Collect landmarks that are in view distance
+        landmarks_pos = np.array(self.map.get_landmark_positions())
+        distance_matrix = np.linalg.norm(landmarks_pos - [self.x, self.y], axis=1)
+        self.landmarks_in_view = landmarks_pos[(distance_matrix <= VIEW_DIST) & (distance_matrix >= 0)]
+
     def pred(self):
         """PREDICTION STEP 1
         Formula: µ_t = A_t * µ_{t-1} + B_t * u_t
@@ -163,27 +171,26 @@ class Simulation:
         """
         prev_x, prev_y, prev_theta = self.history_pred[-1]
         new_pose = \
-            np.array([ # µ_{t-1}
+            np.array([  # µ_{t-1}
                 [prev_x],
                 [prev_y],
                 [prev_theta]
             ]) + \
-            np.array([ # B_t
+            np.array([  # B_t
                 [DT * np.cos(prev_theta), 0.0],
                 [DT * np.sin(prev_theta), 0.0],
-                [0                      , DT]
+                [0, DT]
             ]).dot(
-                np.array([self.v, self.w]).reshape((2, 1)) # u_t
+                np.array([self.v, self.w]).reshape((2, 1))  # u_t
             )
-        
+
         new_pose = [new_pose[0, 0], new_pose[1, 0], new_pose[2, 0]]
 
         # Add simulated noise to new pose:
         new_pose += np.array([
-            random.normalvariate(0, 0.1),   # Noise on the x value of bot
-            random.normalvariate(0, 0.1),   # Noise on the y value of bot
-            random.normalvariate(0, 0.01)]) # Noise on rotation of bot
-
+            random.normalvariate(0, 0.1),  # Noise on the x value of bot
+            random.normalvariate(0, 0.1),  # Noise on the y value of bot
+            random.normalvariate(0, 0.01)])  # Noise on rotation of bot
 
         """PREDICTION STEP 2
         Formula: Sigma_t = A_t * Sigma_{t-1} * A_t^T + R_t
@@ -205,40 +212,60 @@ class Simulation:
 
         return new_pose
 
-
     def correct(self):
         # If there are no landmarks we cannot apply the correction step.
         if len(self.landmarks_in_view) <= 0:
             return self.history_pred[-1]
-        
+
         # Locate current position of robot using landmarks.
-        landmarks = np.array(self.landmarks_in_view)
-        
         # ARS 19.21
-        [distances] = np.array([np.sqrt((landmarks[:, 0] - self.x)**2 + (landmarks[:, 1] - self.y)**2)]) # r
-        [bearings] = np.array([np.arctan2(landmarks[:, 1] - self.y, landmarks[:, 0] - self.x) - self.theta]) # Φ
-        
+        distances = np.linalg.norm(self.landmarks_in_view - [self.x, self.y], axis=1)  # r
+        [bearings] = np.array([np.arctan2(self.landmarks_in_view[:, 1] - self.y,
+                                          self.landmarks_in_view[:, 0] - self.x) - self.theta])  # Φ
+
         # Predict location of robot beased on landmarks.
-        if len(landmarks) >= 3:
+        if len(self.landmarks_in_view) >= 3:
             # Location can be gotten from triangulation.
-            predicted_x, predicted_y = self.trilaterate(landmarks[0], landmarks[1], landmarks[2], distances[0], distances[1], distances[2])
+            predicted_x, predicted_y = self.trilaterate(self.landmarks_in_view[0], self.landmarks_in_view[1],
+                                                        self.landmarks_in_view[2], distances[0],
+                                                        distances[1], distances[2])
+
+        # elif len(self.landmarks_in_view) == 2:
+        #     heading = self.theta * 180 / np.pi
+        #     theta1 = np.arctan2(self.landmarks_in_view[0][1], self.landmarks_in_view[0][0])
+        #     theta2 = np.arctan2(np.sin(heading), np.cos(heading))
+        #     sensor_angle_measured = theta2 - theta1
+        #
+        #     intersections = self.get_circle_intersection(self.landmarks_in_view[0], distances[0], self.landmarks_in_view[1], distances[1])
+        #     theta2 = np.arctan2(intersections[0][1], intersections[0][0])
+        #     sensor_angle_1 = theta2 - theta1
+        #
+        #     theta2 = np.arctan2(intersections[1][1], intersections[1][0])
+        #     sensor_angle_2 = theta2 - theta1
+        #
+        #     print(sensor_angle_measured)
+        #     print(sensor_angle_1, sensor_angle_2)
+            print()
+
+
+
         else:
             # TODO: Locate current location from landmarks when less than 3.
             predicted_x = self.history_pred[-1][0]
             predicted_y = self.history_pred[-1][1]
-            
+
         # TODO: Predict orientation (theta) of robot using first landmark.
         predicted_theta = self.history_pred[-1][2]
-            
+
         # TODO: Add noise
         z_t = (
             np.array([predicted_x, predicted_y, predicted_theta])
             #    + np.array([random.normalvariate(0, 1), random.normalvariate(0, 1), random.normalvariate(0, 1)])
         ).T
-        
+
         print("Predicted current location using landmarks:\n", z_t)
         print("Actual current location:\n", np.array([self.x, self.y, self.theta]), "\n")
-            
+
         """
         CORRECTION STEP 1
         Formula: K_t = Sigma_t * (C_t)^T * (C_t * Sigma_t * (C_t)^T + Q_t)^-1
@@ -248,7 +275,7 @@ class Simulation:
             (C_t)^T = Transposed identity matrix so just identity matrix.
             Q_t = Noise
         """
-        
+
         Sigma_t = self.covariance
         C_t = np.identity(3)
         Q_t = np.array([
@@ -256,9 +283,9 @@ class Simulation:
             [0.0, random.normalvariate(0, 1), 0.0],
             [0.0, 0.0, random.normalvariate(0, 1)],
         ])
-        
+
         K_t = Sigma_t @ C_t.T @ np.linalg.inv(C_t @ Sigma_t @ C_t.T + Q_t)
-        
+
         """
         CORRECTION STEP 2
         Formula: µ_t = µ_t + K_t * (z_t - C_t * µ_t)
@@ -268,11 +295,11 @@ class Simulation:
             z_t = Predicted current state at time t.
             C_t = Identity matrix
         """
-        
+
         mu_t = self.history_pred[-1]
-        
+
         mu_t = mu_t + K_t @ (z_t - C_t @ mu_t)
-        
+
         """
         CORRECTION STEP 3
         Formula: Sigma_t = (I - K_t * C_t) * Sigma_t
@@ -282,11 +309,10 @@ class Simulation:
             C_t = Identity matrix.
             Sigma_t = Covariance matrix at interval t.
         """
-        
+
         self.covariance = (np.identity(3) - K_t @ C_t) @ self.covariance
 
         return mu_t
-
 
     def triangulate_position(self):
         """
@@ -294,13 +320,13 @@ class Simulation:
         This can only be done if 3 or more landmarks are in the vision radius of the bot.
         After the position is triangulated, some noise is added to simulate sensor noise
         """
-        lms = []    # List of landmarks (just for easier use, not necessary)
+        lms = []  # List of landmarks (just for easier use, not necessary)
         dists = []  # List of distances for each landmark
         for i in range(3):
             lm = self.landmarks_in_view[i]
             lms.append(lm)
-            dists.append(np.sqrt((lm[0] - self.x)**2 + (lm[1] - self.y)**2))
-        new_position = self.trilaterate(lms[0], lms[1], lms[2], dists[0], dists[1], dists[2])
+            dists.append(np.sqrt((lm[0] - self.x) ** 2 + (lm[1] - self.y) ** 2))
+        new_position = self.trilaterate(lms[1], lms[2], dists[0], dists[1], dists[2], )
 
         # Add simulated sensor noise
         new_position[0] += random.normalvariate(1, 0.01)
@@ -308,23 +334,42 @@ class Simulation:
 
         # After we got a new position, the bearing of the robot has to be adjusted as well
         # For that we choose the first landmark
-        new_theta = self.theta 
-    
-        return new_position[0], new_position[1], new_theta # triangulated x and y, and last known theta
+        new_theta = self.theta
+
+        return new_position[0], new_position[1], new_theta  # triangulated x and y, and last known theta
 
     # Created with ChatGPT
-    def trilaterate(self, p1, p2, p3, d1, d2, d3):
+    @staticmethod
+    def trilaterate(p1, p2, p3, d1, d2, d3):
         def objective(x):
-            return np.sum([(np.linalg.norm(x - p1) - d1)**2,
-                        (np.linalg.norm(x - p2) - d2)**2,
-                        (np.linalg.norm(x - p3) - d3)**2])
-        
+            return np.sum([(np.linalg.norm(x - p1) - d1) ** 2,
+                           (np.linalg.norm(x - p2) - d2) ** 2,
+                           (np.linalg.norm(x - p3) - d3) ** 2])
+
         initial_guess = np.array([0, 0])
         result = minimize(objective, initial_guess)
         return result.x
 
+    @staticmethod
+    def get_circle_intersection(cords1: tuple, r0: float, cords2: tuple, r1: float) -> (float, float, float, float):
+        x0, y0 = cords1
+        x1, y1 = cords2
 
+        distance = ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5
 
+        a = (r0 ** 2 - r1 ** 2 + distance ** 2) / (2 * distance)
+        h = (r0 ** 2 - a ** 2) ** 0.5
+        xm = x0 + a * (x1 - x0) / distance
+        ym = y0 + a * (y1 - y0) / distance
+
+        # intersection coordiantes
+        x_int_1 = xm + h * (y1 - y0) / distance
+        y_int_1 = ym - h * (x1 - x0) / distance
+        x_int_2 = xm - h * (y1 - y0) / distance
+        y_int_2 = ym + h * (x1 - x0) / distance
+        intersections = [[x_int_1, y_int_1], [x_int_2, y_int_2]]
+
+        return intersections
 
     def run(self):
         is_running = True
@@ -361,10 +406,10 @@ class Simulation:
                 ))
             self.draw()
 
-            
             pygame.display.flip()
             self.clock.tick(FPS)
             tick_counter += 1
+
 
 if __name__ == '__main__':
     disp = Simulation(400, 300)
