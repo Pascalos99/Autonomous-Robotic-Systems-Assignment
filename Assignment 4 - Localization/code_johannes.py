@@ -256,7 +256,7 @@ class Simulation:
             predicted_y = self.history_pred[-1][1]
             
         # Predict orientation (theta) of robot using first landmark.
-        relative_position = landmarks[0] - [predicted_x, predicted_y]
+        relative_position = self.landmarks_in_view[0] - [predicted_x, predicted_y]
         predicted_theta = np.arctan2(relative_position[1], relative_position[0]) - bearings[0]
             
         # TODO: Add noise
