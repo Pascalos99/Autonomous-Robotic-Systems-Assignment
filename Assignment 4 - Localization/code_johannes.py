@@ -208,7 +208,8 @@ class Simulation:
 
     def correct(self):
         # If there are no landmarks we cannot apply the correction step.
-        if len(self.landmarks_in_view) <= 0:
+        # TODO: Change landmarks needed when location can be decided for less than 3 landmarks.
+        if len(self.landmarks_in_view) <= 2:
             return self.history_pred[-1]
         
         # Locate current position of robot using landmarks.
@@ -228,7 +229,7 @@ class Simulation:
             predicted_y = self.history_pred[-1][1]
             
         # Predict orientation (theta) of robot using first landmark.
-        relative_position = landmarks[0] - [self.x, self.y]
+        relative_position = landmarks[0] - [predicted_x, predicted_y]
         predicted_theta = np.arctan2(relative_position[1], relative_position[0]) - bearings[0]
             
         # TODO: Add noise
