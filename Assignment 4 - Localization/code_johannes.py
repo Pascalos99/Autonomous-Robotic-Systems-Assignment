@@ -238,25 +238,27 @@ class Simulation:
             correct_intersection = None
             for intersection in intersections:
                 [bearings_intersection] = np.array([np.arctan2(self.landmarks_in_view[:, 1] - intersection[1],
-                                 self.landmarks_in_view[:, 0] - intersection[0]) - self.theta])
-                
+                                                               self.landmarks_in_view[:, 0] - intersection[
+                                                                   0]) - self.theta])
+
                 intersection_error = 0
                 for i, bearing in np.ndenumerate(bearings_intersection):
-                    intersection_error += (bearing - bearings[i])**2
+                    intersection_error += (bearing - bearings[i]) ** 2
 
                 if error > intersection_error:
                     error = intersection_error
                     correct_intersection = intersection
 
             predicted_x, predicted_y = correct_intersection
-            
+
         # Predict orientation (theta) of robot using first landmark.
         relative_position = self.landmarks_in_view[0] - [predicted_x, predicted_y]
         predicted_theta = np.arctan2(relative_position[1], relative_position[0]) - bearings[0]
-            
+
         z_t = (
-            np.array([predicted_x, predicted_y, predicted_theta])
-            + np.array([random.normalvariate(0, 0.05), random.normalvariate(0, 0.05), random.normalvariate(0, 0.05)])
+                np.array([predicted_x, predicted_y, predicted_theta])
+                + np.array(
+            [random.normalvariate(0, 0.05), random.normalvariate(0, 0.05), random.normalvariate(0, 0.05)])
         ).T
 
         """
