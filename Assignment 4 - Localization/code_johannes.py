@@ -223,15 +223,18 @@ class Simulation:
             # Location can be gotten from triangulation.
             predicted_x, predicted_y = self.trilaterate(landmarks[0], landmarks[1], landmarks[2], distances[0], distances[1], distances[2])
         else:
-            # TODO: Locate current location from landmarks.
+            # TODO: Locate current location from landmarks when less than 3.
             predicted_x = self.history_pred[-1][0]
             predicted_y = self.history_pred[-1][1]
             
-        # Predict orientation (theta) of robot using first landmark.
-        # TODO:
+        # TODO: Predict orientation (theta) of robot using first landmark.
         predicted_theta = self.history_pred[-1][2]
             
-        z_t = (np.array([predicted_x, predicted_y, predicted_theta]) + np.array([random.normalvariate(0, 1), random.normalvariate(0, 1), random.normalvariate(0, 1)])).T
+        # TODO: Add noise
+        z_t = (
+            np.array([predicted_x, predicted_y, predicted_theta])
+            #    + np.array([random.normalvariate(0, 1), random.normalvariate(0, 1), random.normalvariate(0, 1)])
+        ).T
         
         print("Predicted current location using landmarks:\n", z_t)
         print("Actual current location:\n", np.array([self.x, self.y, self.theta]), "\n")
