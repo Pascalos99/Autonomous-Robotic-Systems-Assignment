@@ -211,19 +211,25 @@ class Simulation:
         if len(self.landmarks_in_view) <= 0:
             return self.history_pred[-1]
         
-        # If enough landmarks are present, the current location can easily be triangulated
-        if len(self.landmarks_in_view) >= 3:
-            return self.triangulate_position()
-        
         # Locate current position of robot using landmarks.
         landmarks = np.array(self.landmarks_in_view)
-        distances = np.array([landmarks[:, 0] - self.x, landmarks[:, 1] - self.y])
-        bearings = np.array([np.arctan2(landmarks[:, 1] - self.y, landmarks[:, 0] - self.x) - self.theta])
         
-        # TODO: Locate current location from landmarks.
-        predicted_x = self.history_pred[-1][0]
-        predicted_y = self.history_pred[-1][1]
-        predicted_theta = self.history_pred[-1][2]
+        # ARS 19.21
+        [distances] = np.array([np.sqrt((landmarks[:, 0] - self.x)**2 + (landmarks[:, 1] - self.y)**2)]) # r
+        [bearings] = np.array([np.arctan2(landmarks[:, 1] - self.y, landmarks[:, 0] - self.x) - self.theta]) # Φ
+        
+        # Predict location of robot beased on landmarks.
+        if len(landmarks) >= 3:
+            # Location can be gotten from triangulation.
+            predicted_x, predicted_y = self.trilaterate(landmarks[0], landmarks[1], landmarks[2], distances[0], distances[1], distances[2])
+        else:
+            # TODO: Locate current location from landmarks.
+            predicted_x = self.history_pred[-1][0]
+            predicted_y = self.history_pred[-1][1]
+            
+        # Predict orientation (theta) of robot using first landmark.
+        # TODO:
+        predicted_theta = self.history_pred[-1]
             
         z_t = (np.array([predicted_x, predicted_y, predicted_theta]) + np.array([random.normalvariate(0, 1), random.normalvariate(0, 1), random.normalvariate(0, 1)])).T
         
